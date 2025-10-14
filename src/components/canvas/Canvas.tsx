@@ -1,9 +1,11 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Stage, Layer, Circle } from 'react-konva';
 import Konva from 'konva';
 import { useAuth } from '../../hooks/useAuth';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { getCanvasById } from '../../services/canvas.service';
+import { createShape as createShapeInFirebase, updateShape as updateShapeInFirebase } from '../../services/canvasObjects.service';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { CanvasToolbar } from './CanvasToolbar';
@@ -83,6 +85,13 @@ export const Canvas: React.FC = () => {
 
     loadCanvas();
   }, [canvasId, currentUser]);
+
+  // Real-time sync: Subscribe to Firestore changes for this canvas
+  const handleShapesUpdate = useCallback((syncedShapes: CanvasObject[]) => {
+    setShapes(syncedShapes);
+  }, []);
+
+  useRealtimeSync(canvasId, handleShapesUpdate);
 
   // Handle window resize
   useEffect(() => {
@@ -213,20 +222,39 @@ export const Canvas: React.FC = () => {
     setNewShapePreview(preview);
   };
 
-  const handleStageMouseUp = () => {
-    if (!isCreatingShape || !newShapePreview) return;
+  const handleStageMouseUp = async () => {
+    if (!isCreatingShape || !newShapePreview || !canvasId || !currentUser) return;
 
     // Only create shape if it has meaningful size (at least 5x5 pixels)
     if (newShapePreview.width >= 5 && newShapePreview.height >= 5) {
-      const newShape: CanvasObject = {
-        ...newShapePreview,
+      const shapeData = {
+        type: newShapePreview.type,
+        x: newShapePreview.x,
+        y: newShapePreview.y,
+        width: newShapePreview.width,
+        height: newShapePreview.height,
+        fill: newShapePreview.fill,
+        createdBy: currentUser.id,
+      };
+
+      // Optimistic update: Add to local state immediately
+      const optimisticShape: CanvasObject = {
+        ...shapeData,
         id: generateUniqueId(),
-        createdBy: currentUser?.id || '',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+      setShapes([...shapes, optimisticShape]);
 
-      setShapes([...shapes, newShape]);
+      // Write to Firebase (async, fire and forget)
+      try {
+        await createShapeInFirebase(canvasId, shapeData);
+        // Firestore listener will update with the actual shape from server
+      } catch (error) {
+        console.error('Failed to create shape in Firebase:', error);
+        // Revert optimistic update on error
+        setShapes(shapes); // Remove the optimistic shape
+      }
     }
 
     // Reset creation state
@@ -240,7 +268,10 @@ export const Canvas: React.FC = () => {
     setSelectedShapeId(id);
   };
 
-  const handleShapeDragEnd = (id: string, x: number, y: number) => {
+  const handleShapeDragEnd = async (id: string, x: number, y: number) => {
+    if (!canvasId) return;
+
+    // Optimistic update: Update local state immediately
     setShapes(
       shapes.map((shape) =>
         shape.id === id
@@ -248,6 +279,15 @@ export const Canvas: React.FC = () => {
           : shape
       )
     );
+
+    // Write to Firebase (async, fire and forget)
+    try {
+      await updateShapeInFirebase(canvasId, id, { x, y });
+      // Firestore listener will confirm the update
+    } catch (error) {
+      console.error('Failed to update shape in Firebase:', error);
+      // Could implement rollback here if needed
+    }
   };
 
   // Calculate actual stage height (used in multiple places)
