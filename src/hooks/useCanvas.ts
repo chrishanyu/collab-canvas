@@ -18,7 +18,7 @@ export const useCanvas = () => {
     height: number,
     fill: string,
     createdBy: string
-  ): void => {
+  ): CanvasObject => {
     const shapeData: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt'> = {
       type: 'rectangle',
       x,
@@ -28,7 +28,7 @@ export const useCanvas = () => {
       fill,
       createdBy,
     };
-    context.createShape(shapeData);
+    return context.createShape(shapeData);
   };
 
   /**
