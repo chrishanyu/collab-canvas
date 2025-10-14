@@ -39,7 +39,6 @@ export interface UserPresence {
   displayName: string;
   cursorX: number;
   cursorY: number;
-  color: string;
   lastSeen: Date;
 }
 

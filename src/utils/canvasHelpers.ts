@@ -53,3 +53,39 @@ export const generateUniqueId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
 
+/**
+ * Generate cursor color for a user
+ * Current user always gets black, all others get random colors
+ * @param userId - User ID
+ * @param currentUserId - Current logged-in user ID
+ * @returns Hex color string
+ */
+export const getUserCursorColor = (userId: string, currentUserId: string): string => {
+  // Current user always gets black
+  if (userId === currentUserId) {
+    return '#000000';
+  }
+
+  // Predefined colors for other users (vibrant, distinguishable colors)
+  const userColors = [
+    '#EF4444', // red-500
+    '#F59E0B', // amber-500
+    '#10B981', // emerald-500
+    '#3B82F6', // blue-500
+    '#8B5CF6', // violet-500
+    '#EC4899', // pink-500
+    '#06B6D4', // cyan-500
+    '#F97316', // orange-500
+    '#14B8A6', // teal-500
+    '#6366F1', // indigo-500
+  ];
+
+  // Generate deterministic but pseudo-random index from userId
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % userColors.length;
+
+  return userColors[index];
+};
