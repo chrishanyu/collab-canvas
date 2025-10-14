@@ -7,8 +7,9 @@ import { getCanvasById } from '../../services/canvas.service';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { CanvasToolbar } from './CanvasToolbar';
-import { constrainZoom } from '../../utils/canvasHelpers';
-import type { Canvas as CanvasType } from '../../types';
+import { Shape } from './Shape';
+import { constrainZoom, getRelativePointerPosition, generateUniqueId } from '../../utils/canvasHelpers';
+import type { Canvas as CanvasType, CanvasObject } from '../../types';
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
@@ -44,6 +45,15 @@ export const Canvas: React.FC = () => {
   const [stageScale, setStageScale] = useState(DEFAULT_ZOOM);
   const [stageX, setStageX] = useState(DEFAULT_CANVAS_X);
   const [stageY, setStageY] = useState(DEFAULT_CANVAS_Y);
+
+  // Shape state
+  const [shapes, setShapes] = useState<CanvasObject[]>([]);
+  const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
+  
+  // Shape creation state
+  const [isCreatingShape, setIsCreatingShape] = useState(false);
+  const [newShapeStart, setNewShapeStart] = useState<{ x: number; y: number } | null>(null);
+  const [newShapePreview, setNewShapePreview] = useState<CanvasObject | null>(null);
 
   // Load canvas metadata
   useEffect(() => {
@@ -144,6 +154,100 @@ export const Canvas: React.FC = () => {
   const handleZoomOut = () => {
     const newScale = constrainZoom(stageScale - ZOOM_SPEED);
     setStageScale(newScale);
+  };
+
+  // Shape creation handlers
+  const handleAddRectangle = () => {
+    setIsCreatingShape(true);
+    setSelectedShapeId(null); // Deselect any selected shape
+  };
+
+  const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Only handle shape creation if in creation mode
+    if (!isCreatingShape) {
+      // Click on empty space deselects shapes
+      const clickedOnEmpty = e.target === e.target.getStage();
+      if (clickedOnEmpty) {
+        setSelectedShapeId(null);
+      }
+      return;
+    }
+
+    // Start creating shape
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const pos = getRelativePointerPosition(stage);
+    if (!pos) return;
+
+    setNewShapeStart(pos);
+  };
+
+  const handleStageMouseMove = () => {
+    if (!isCreatingShape || !newShapeStart) return;
+
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const pos = getRelativePointerPosition(stage);
+    if (!pos) return;
+
+    // Calculate rectangle dimensions
+    const width = pos.x - newShapeStart.x;
+    const height = pos.y - newShapeStart.y;
+
+    // Create preview shape
+    const preview: CanvasObject = {
+      id: 'preview',
+      type: 'rectangle',
+      x: width >= 0 ? newShapeStart.x : pos.x,
+      y: height >= 0 ? newShapeStart.y : pos.y,
+      width: Math.abs(width),
+      height: Math.abs(height),
+      fill: '#3B82F6', // blue-500
+      createdBy: currentUser?.id || '',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    setNewShapePreview(preview);
+  };
+
+  const handleStageMouseUp = () => {
+    if (!isCreatingShape || !newShapePreview) return;
+
+    // Only create shape if it has meaningful size (at least 5x5 pixels)
+    if (newShapePreview.width >= 5 && newShapePreview.height >= 5) {
+      const newShape: CanvasObject = {
+        ...newShapePreview,
+        id: generateUniqueId(),
+        createdBy: currentUser?.id || '',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      setShapes([...shapes, newShape]);
+    }
+
+    // Reset creation state
+    setIsCreatingShape(false);
+    setNewShapeStart(null);
+    setNewShapePreview(null);
+  };
+
+  // Shape interaction handlers
+  const handleSelectShape = (id: string) => {
+    setSelectedShapeId(id);
+  };
+
+  const handleShapeDragEnd = (id: string, x: number, y: number) => {
+    setShapes(
+      shapes.map((shape) =>
+        shape.id === id
+          ? { ...shape, x, y, updatedAt: new Date() }
+          : shape
+      )
+    );
   };
 
   // Calculate actual stage height (used in multiple places)
@@ -269,6 +373,8 @@ export const Canvas: React.FC = () => {
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         currentZoom={stageScale}
+        onAddRectangle={handleAddRectangle}
+        isCreatingShape={isCreatingShape}
       />
 
       {/* Konva Stage */}
@@ -281,9 +387,12 @@ export const Canvas: React.FC = () => {
           scaleY={stageScale}
           x={stageX}
           y={stageY}
-          draggable={true}
+          draggable={!isCreatingShape} // Disable pan while creating shapes
           onDragEnd={handleDragEnd}
           onWheel={handleWheel}
+          onMouseDown={handleStageMouseDown}
+          onMouseMove={handleStageMouseMove}
+          onMouseUp={handleStageMouseUp}
         >
           {/* Background Grid Layer - scales with zoom */}
           <Layer listening={false}>
@@ -292,8 +401,27 @@ export const Canvas: React.FC = () => {
           
           {/* Main Content Layer */}
           <Layer>
-            {/* Canvas objects will be rendered here in future tasks */}
-            {/* For now, the layer is empty - just basic rendering */}
+            {/* Render existing shapes */}
+            {shapes.map((shape) => (
+              <Shape
+                key={shape.id}
+                shape={shape}
+                isSelected={shape.id === selectedShapeId}
+                onSelect={handleSelectShape}
+                onDragEnd={handleShapeDragEnd}
+              />
+            ))}
+            
+            {/* Render preview shape while creating */}
+            {newShapePreview && (
+              <Shape
+                key="preview"
+                shape={newShapePreview}
+                isSelected={false}
+                onSelect={() => {}}
+                onDragEnd={() => {}}
+              />
+            )}
           </Layer>
         </Stage>
       </div>
