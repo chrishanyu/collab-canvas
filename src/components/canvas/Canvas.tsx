@@ -10,6 +10,7 @@ import { LoadingSpinner } from '../common/LoadingSpinner';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { CanvasToolbar } from './CanvasToolbar';
 import { Shape } from './Shape';
+import { UserPresence } from '../presence/UserPresence';
 import { constrainZoom, getRelativePointerPosition, generateUniqueId } from '../../utils/canvasHelpers';
 import type { Canvas as CanvasType, CanvasObject } from '../../types';
 import {
@@ -56,6 +57,9 @@ export const Canvas: React.FC = () => {
   const [isCreatingShape, setIsCreatingShape] = useState(false);
   const [newShapeStart, setNewShapeStart] = useState<{ x: number; y: number } | null>(null);
   const [newShapePreview, setNewShapePreview] = useState<CanvasObject | null>(null);
+
+  // Presence state
+  const updateCursorRef = useRef<((x: number, y: number) => void) | null>(null);
 
   // Load canvas metadata
   useEffect(() => {
@@ -290,6 +294,22 @@ export const Canvas: React.FC = () => {
     }
   };
 
+  // Handle cursor movement for presence
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (updateCursorRef.current) {
+      // Convert viewport coordinates to canvas coordinates
+      // This ensures cursors appear in the same position regardless of zoom/pan
+      const canvasX = (e.clientX - stageX) / stageScale;
+      const canvasY = (e.clientY - HEADER_HEIGHT - stageY) / stageScale;
+      updateCursorRef.current(canvasX, canvasY);
+    }
+  };
+
+  // Callback to receive updateCursor function from UserPresence
+  const handleCursorMove = useCallback((updateCursor: (x: number, y: number) => void) => {
+    updateCursorRef.current = updateCursor;
+  }, []);
+
   // Calculate actual stage height (used in multiple places)
   const actualStageHeight = stageHeight - HEADER_HEIGHT;
 
@@ -385,7 +405,11 @@ export const Canvas: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-gray-100">
+    <div 
+      className="relative w-full h-screen overflow-hidden bg-gray-100"
+      onMouseMove={handleMouseMove}
+      style={{ cursor: 'none' }}
+    >
       {/* Canvas Header */}
       <div className="absolute top-0 left-0 right-0 z-10 bg-white shadow-sm px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -473,6 +497,18 @@ export const Canvas: React.FC = () => {
         <div>Scale: {stageScale.toFixed(2)}x</div>
         <div>Position: ({Math.round(stageX)}, {Math.round(stageY)})</div>
       </div>
+
+      {/* User Presence - Cursors and Online Users */}
+      <UserPresence
+        canvasId={canvasId}
+        userId={currentUser?.id}
+        displayName={currentUser?.displayName}
+        onCursorMove={handleCursorMove}
+        stageX={stageX}
+        stageY={stageY}
+        stageScale={stageScale}
+        headerHeight={HEADER_HEIGHT}
+      />
     </div>
   );
 };

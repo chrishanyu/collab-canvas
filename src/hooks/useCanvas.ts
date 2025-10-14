@@ -1,5 +1,5 @@
 import { useCanvasContext } from './useCanvasContext';
-import { CanvasObject } from '../types';
+import type { CanvasObject } from '../types';
 
 /**
  * Custom hook for canvas operations
@@ -18,7 +18,7 @@ export const useCanvas = () => {
     height: number,
     fill: string,
     createdBy: string
-  ): CanvasObject => {
+  ): void => {
     const shapeData: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt'> = {
       type: 'rectangle',
       x,
@@ -28,7 +28,7 @@ export const useCanvas = () => {
       fill,
       createdBy,
     };
-    return context.createShape(shapeData);
+    context.createShape(shapeData);
   };
 
   /**
