@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { User } from '../types';
 import {
   registerUser as register,
@@ -7,19 +7,11 @@ import {
   onAuthStateChange,
   mapFirebaseUserToUser,
 } from '../services/auth.service';
+import { AuthContext } from './authContextDefinition';
+import type { AuthContextType } from './authContextDefinition';
 
-interface AuthContextType {
-  currentUser: User | null;
-  loading: boolean;
-  error: string | null;
-  register: (email: string, password: string, displayName: string) => Promise<User>;
-  login: (email: string, password: string) => Promise<User>;
-  logout: () => Promise<void>;
-  clearError: () => void;
-}
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export { AuthContext };
+export type { AuthContextType };
 
 interface AuthProviderProps {
   children: React.ReactNode;
