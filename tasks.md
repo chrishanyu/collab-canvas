@@ -416,6 +416,17 @@ collabcanvas/
   - **Note:** Performance testing with shapes will be done in PR #5 (Shape Creation)
   - **Result:** Canvas renders smoothly with pan/zoom operations
 
+- [x] Add dotted grid background
+  - **Files modified:** `src/components/canvas/Canvas.tsx`
+  - **Purpose:** Visual enhancement to help users see canvas space and positioning
+  - **Implementation:** Konva layer with dynamically rendered dots that scale with zoom
+  - **Optimizations:**
+    - Viewport culling: Only renders dots visible in current viewport (with padding)
+    - Safety checks: Validates scale, range, and prevents infinite values
+    - Performance flags: `perfectDrawEnabled={false}` and `listening={false}`
+  - **Spacing:** Consistent 20px spacing between dots at all zoom levels
+  - **Result:** Professional grid that scales with zoom; renders all visible dots
+
 **PR Review Checklist:**
 - [x] Unit tests pass for canvas helpers - ✅ 16/16 passing (100%)
 - [x] Canvas renders in full viewport - ✅ Responsive to window resize
@@ -425,6 +436,7 @@ collabcanvas/
 - [x] Toolbar buttons work (reset, zoom in/out) - ✅ All controls functional
 - [x] Performance stays at 60 FPS during pan/zoom - ✅ Konva optimized rendering
 - [x] Canvas visible only after authentication - ✅ Protected route with `CanvasWrapper`
+- [x] Dotted grid background added - ✅ Scales with zoom, viewport optimized
 
 ---
 

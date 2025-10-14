@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { Stage, Layer } from 'react-konva';
+import { Stage, Layer, Circle } from 'react-konva';
 import Konva from 'konva';
 import { useAuth } from '../../hooks/useAuth';
 import { getCanvasById } from '../../services/canvas.service';
@@ -17,6 +17,10 @@ import {
   DEFAULT_CANVAS_Y,
   ZOOM_SPEED,
 } from '../../utils/constants';
+
+// Canvas UI constants
+const HEADER_HEIGHT = 60;
+const MAX_GRID_DOTS = 10000; // Safety limit to prevent performance issues
 
 /**
  * Canvas Component
@@ -142,6 +146,74 @@ export const Canvas: React.FC = () => {
     setStageScale(newScale);
   };
 
+  // Calculate actual stage height (used in multiple places)
+  const actualStageHeight = stageHeight - HEADER_HEIGHT;
+
+  // Generate grid dots for background (optimized for viewport)
+  // Memoized to prevent unnecessary re-renders
+  const gridDots = useMemo(() => {
+    const dots: React.ReactElement[] = [];
+    const dotSpacing = 20; // 20px spacing between dots
+    const dotRadius = 1; // 1px dot radius
+    const dotColor = '#d1d5db'; // gray-300
+
+    // Prevent errors when stageScale, stageX, or stageY are invalid
+    if (
+      stageScale <= 0 || 
+      !isFinite(stageScale) || 
+      !isFinite(stageX) || 
+      !isFinite(stageY)
+    ) {
+      return dots;
+    }
+
+    // Calculate visible area based on current pan and zoom with safety checks
+    const viewportWidth = stageWidth / stageScale;
+    const viewportHeight = actualStageHeight / stageScale;
+    const viewportX = -stageX / stageScale;
+    const viewportY = -stageY / stageScale;
+
+    // Add padding for smooth scrolling
+    const padding = dotSpacing * 5;
+
+    const visibleStartX = Math.max(0, Math.floor((viewportX - padding) / dotSpacing) * dotSpacing);
+    const visibleEndX = Math.min(CANVAS_WIDTH, Math.ceil((viewportX + viewportWidth + padding) / dotSpacing) * dotSpacing);
+    const visibleStartY = Math.max(0, Math.floor((viewportY - padding) / dotSpacing) * dotSpacing);
+    const visibleEndY = Math.min(CANVAS_HEIGHT, Math.ceil((viewportY + viewportHeight + padding) / dotSpacing) * dotSpacing);
+
+    // Safety check: if range is invalid, return empty
+    const xRange = visibleEndX - visibleStartX;
+    const yRange = visibleEndY - visibleStartY;
+    if (xRange < 0 || yRange < 0 || !isFinite(xRange) || !isFinite(yRange)) {
+      return dots;
+    }
+
+    // Safety check: prevent rendering too many dots
+    const estimatedDots = (xRange / dotSpacing) * (yRange / dotSpacing);
+    if (estimatedDots > MAX_GRID_DOTS) {
+      return dots;
+    }
+
+    // Render all visible dots
+    for (let x = visibleStartX; x <= visibleEndX; x += dotSpacing) {
+      for (let y = visibleStartY; y <= visibleEndY; y += dotSpacing) {
+        dots.push(
+          <Circle
+            key={`dot-${x}-${y}`}
+            x={x}
+            y={y}
+            radius={dotRadius}
+            fill={dotColor}
+            listening={false}
+            perfectDrawEnabled={false}
+          />
+        );
+      }
+    }
+
+    return dots;
+  }, [stageScale, stageX, stageY, stageWidth, actualStageHeight]);
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -200,11 +272,11 @@ export const Canvas: React.FC = () => {
       />
 
       {/* Konva Stage */}
-      <div className="pt-[60px] w-full h-full">
+      <div className="pt-[60px] w-full h-full bg-gray-50">
         <Stage
           ref={stageRef}
           width={stageWidth}
-          height={stageHeight - 60} // Subtract header height
+          height={actualStageHeight}
           scaleX={stageScale}
           scaleY={stageScale}
           x={stageX}
@@ -213,6 +285,12 @@ export const Canvas: React.FC = () => {
           onDragEnd={handleDragEnd}
           onWheel={handleWheel}
         >
+          {/* Background Grid Layer - scales with zoom */}
+          <Layer listening={false}>
+            {gridDots}
+          </Layer>
+          
+          {/* Main Content Layer */}
           <Layer>
             {/* Canvas objects will be rendered here in future tasks */}
             {/* For now, the layer is empty - just basic rendering */}
@@ -223,7 +301,7 @@ export const Canvas: React.FC = () => {
       {/* Canvas Info (dev only - can be removed later) */}
       <div className="absolute bottom-4 left-4 bg-white/90 rounded-lg shadow-lg px-4 py-2 text-xs text-gray-600">
         <div>Canvas: {CANVAS_WIDTH} × {CANVAS_HEIGHT}px</div>
-        <div>Viewport: {stageWidth} × {stageHeight - 60}px</div>
+        <div>Viewport: {stageWidth} × {actualStageHeight}px</div>
         <div>Scale: {stageScale.toFixed(2)}x</div>
         <div>Position: ({Math.round(stageX)}, {Math.round(stageY)})</div>
       </div>

@@ -23,8 +23,9 @@ export const MAX_ZOOM = 3;
  * Zoom speed
  * Controls how fast zooming happens on scroll
  * Higher values = faster zoom, lower values = more granular control
+ * Current: 0.05 = 5% zoom increments for smooth control
  */
-export const ZOOM_SPEED = 0.1;
+export const ZOOM_SPEED = 0.05;
 
 /**
  * Default zoom level when canvas first loads
