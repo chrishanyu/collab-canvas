@@ -2,8 +2,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute, PublicRoute } from './components/common';
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
-import { DashboardPlaceholder } from './components/dashboard/DashboardPlaceholder';
-import { CanvasPlaceholder } from './components/canvas/CanvasPlaceholder';
+import { Dashboard } from './components/dashboard/Dashboard';
+import { CanvasWrapper } from './components/canvas/CanvasWrapper';
 import './App.css';
 
 function App() {
@@ -32,7 +32,7 @@ function App() {
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <DashboardPlaceholder />
+            <Dashboard />
           </ProtectedRoute>
         }
       />
@@ -40,7 +40,7 @@ function App() {
         path="/canvas/:canvasId"
         element={
           <ProtectedRoute>
-            <CanvasPlaceholder />
+            <CanvasWrapper />
           </ProtectedRoute>
         }
       />

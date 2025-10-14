@@ -12,6 +12,15 @@ vi.mock('../../src/services/firebase', () => ({
   db: {},
 }));
 
+// Mock canvas service (needed for Dashboard component from PR #3)
+vi.mock('../../src/services/canvas.service', () => ({
+  getUserCanvases: vi.fn().mockResolvedValue([]),
+  createCanvas: vi.fn(),
+  getCanvasById: vi.fn(),
+  updateCanvasAccess: vi.fn(),
+  generateShareLink: vi.fn(),
+}));
+
 // Helper to render App with all providers
 const renderApp = (initialRoute = '/') => {
   return render(
@@ -351,13 +360,14 @@ describe('Authentication Flow Integration Tests', () => {
 
       renderApp();
 
-      // Wait for dashboard to appear
+      // Wait for dashboard to appear (real Dashboard component from PR #3)
       await waitFor(() => {
-        expect(screen.getByText('Dashboard')).toBeInTheDocument();
+        expect(screen.getByText('CollabCanvas')).toBeInTheDocument();
+        expect(screen.getByText('Your Canvases')).toBeInTheDocument();
       });
 
-      // Click logout button
-      const logoutButton = screen.getByRole('button', { name: /logout/i });
+      // Click logout button (real Dashboard component uses "Sign Out")
+      const logoutButton = screen.getByRole('button', { name: /sign out/i });
       await userEvent.click(logoutButton);
 
       // Should call logoutUser

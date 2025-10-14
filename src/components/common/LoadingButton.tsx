@@ -2,31 +2,35 @@ import React from 'react';
 
 interface LoadingButtonProps {
   loading: boolean;
-  loadingText: string;
+  loadingText?: string;
   children: React.ReactNode;
   type?: 'button' | 'submit' | 'reset';
   disabled?: boolean;
   onClick?: () => void;
+  className?: string;
 }
 
 export const LoadingButton: React.FC<LoadingButtonProps> = ({
   loading,
-  loadingText,
+  loadingText = 'Loading...',
   children,
   type = 'button',
   disabled = false,
   onClick,
+  className = '',
 }) => {
+  const defaultClasses = `w-full flex justify-center items-center px-4 py-3 border border-transparent rounded-lg text-white font-medium transition-all ${
+    loading || disabled
+      ? 'bg-gray-400 cursor-not-allowed'
+      : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+  }`;
+
   return (
     <button
       type={type}
       disabled={loading || disabled}
       onClick={onClick}
-      className={`w-full flex justify-center items-center px-4 py-3 border border-transparent rounded-lg text-white font-medium transition-all ${
-        loading || disabled
-          ? 'bg-gray-400 cursor-not-allowed'
-          : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
-      }`}
+      className={className || defaultClasses}
     >
       {loading ? (
         <>
