@@ -12,65 +12,71 @@ collabcanvas/
 ├── src/
 │   ├── components/
 │   │   ├── auth/
-│   │   │   ├── LoginForm.jsx
-│   │   │   ├── RegisterForm.jsx
-│   │   │   └── AuthLayout.jsx
+│   │   │   ├── LoginForm.tsx
+│   │   │   ├── RegisterForm.tsx
+│   │   │   └── AuthLayout.tsx
 │   │   ├── dashboard/
-│   │   │   ├── Dashboard.jsx
-│   │   │   ├── CanvasCard.jsx
-│   │   │   ├── CreateCanvasModal.jsx
-│   │   │   └── ShareLinkModal.jsx
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── CanvasCard.tsx
+│   │   │   ├── CreateCanvasModal.tsx
+│   │   │   └── ShareLinkModal.tsx
 │   │   ├── canvas/
-│   │   │   ├── Canvas.jsx
-│   │   │   ├── CanvasToolbar.jsx
-│   │   │   ├── Shape.jsx
-│   │   │   └── Cursor.jsx
+│   │   │   ├── Canvas.tsx
+│   │   │   ├── CanvasToolbar.tsx
+│   │   │   ├── Shape.tsx
+│   │   │   └── Cursor.tsx
 │   │   ├── presence/
-│   │   │   ├── UserPresence.jsx
-│   │   │   └── OnlineUsers.jsx
+│   │   │   ├── UserPresence.tsx
+│   │   │   └── OnlineUsers.tsx
 │   │   └── layout/
-│   │       ├── Header.jsx
-│   │       └── Layout.jsx
+│   │       ├── Header.tsx
+│   │       └── Layout.tsx
 │   ├── hooks/
-│   │   ├── useAuth.js
-│   │   ├── useCanvas.js
-│   │   ├── usePresence.js
-│   │   └── useRealtimeSync.js
+│   │   ├── useAuth.ts
+│   │   ├── useCanvas.ts
+│   │   ├── usePresence.ts
+│   │   └── useRealtimeSync.ts
 │   ├── services/
-│   │   ├── firebase.js
-│   │   ├── auth.service.js
-│   │   ├── canvas.service.js
-│   │   ├── canvasObjects.service.js
-│   │   └── presence.service.js
+│   │   ├── firebase.ts
+│   │   ├── auth.service.ts
+│   │   ├── canvas.service.ts
+│   │   ├── canvasObjects.service.ts
+│   │   └── presence.service.ts
 │   ├── context/
-│   │   ├── AuthContext.jsx
-│   │   └── CanvasContext.jsx
+│   │   ├── AuthContext.tsx
+│   │   └── CanvasContext.tsx
 │   ├── utils/
-│   │   ├── canvasHelpers.js
-│   │   └── constants.js
-│   ├── App.jsx
-│   ├── main.jsx
+│   │   ├── canvasHelpers.ts
+│   │   └── constants.ts
+│   ├── types/
+│   │   └── index.ts
+│   ├── App.tsx
+│   ├── main.tsx
+│   ├── vite-env.d.ts
 │   └── index.css
 ├── tests/
-│   ├── setup.js
+│   ├── setup.ts
 │   ├── mocks/
-│   │   └── firebase.mock.js
+│   │   └── firebase.mock.ts
 │   ├── unit/
-│   │   ├── canvasHelpers.test.js
-│   │   ├── auth.service.test.js
-│   │   └── canvas.service.test.js
+│   │   ├── canvasHelpers.test.ts
+│   │   ├── auth.service.test.ts
+│   │   └── canvas.service.test.ts
 │   └── integration/
-│       ├── auth-flow.test.jsx
-│       ├── canvas-operations.test.jsx
-│       └── realtime-sync.test.jsx
+│       ├── auth-flow.test.tsx
+│       ├── canvas-operations.test.tsx
+│       └── realtime-sync.test.tsx
 ├── .env.example
 ├── .env.local (gitignored)
 ├── .gitignore
 ├── package.json
-├── vite.config.js
-├── vitest.config.js
+├── vite.config.ts
+├── vitest.config.ts
 ├── tailwind.config.js
 ├── postcss.config.js
+├── tsconfig.json
+├── tsconfig.app.json
+├── tsconfig.node.json
 ├── index.html
 └── README.md
 ```
