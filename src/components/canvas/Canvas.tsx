@@ -110,6 +110,11 @@ export const Canvas: React.FC = () => {
 
   // Handle pan (drag)
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+    // Only update stage position if the dragged element is the stage itself, not a shape
+    if (e.target !== stageRef.current) {
+      return;
+    }
+    
     const stage = e.target as Konva.Stage;
     setStageX(stage.x());
     setStageY(stage.y());
@@ -340,10 +345,10 @@ export const Canvas: React.FC = () => {
     // Add padding for smooth scrolling
     const padding = dotSpacing * 5;
 
-    const visibleStartX = Math.max(0, Math.floor((viewportX - padding) / dotSpacing) * dotSpacing);
-    const visibleEndX = Math.min(CANVAS_WIDTH, Math.ceil((viewportX + viewportWidth + padding) / dotSpacing) * dotSpacing);
-    const visibleStartY = Math.max(0, Math.floor((viewportY - padding) / dotSpacing) * dotSpacing);
-    const visibleEndY = Math.min(CANVAS_HEIGHT, Math.ceil((viewportY + viewportHeight + padding) / dotSpacing) * dotSpacing);
+    const visibleStartX = Math.floor((viewportX - padding) / dotSpacing) * dotSpacing;
+    const visibleEndX = Math.ceil((viewportX + viewportWidth + padding) / dotSpacing) * dotSpacing;
+    const visibleStartY = Math.floor((viewportY - padding) / dotSpacing) * dotSpacing;
+    const visibleEndY = Math.ceil((viewportY + viewportHeight + padding) / dotSpacing) * dotSpacing;
 
     // Safety check: if range is invalid, return empty
     const xRange = visibleEndX - visibleStartX;
