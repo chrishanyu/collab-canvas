@@ -110,6 +110,11 @@ export const Canvas: React.FC = () => {
 
   // Handle pan (drag)
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+    // Only update stage position if the dragged element is the stage itself, not a shape
+    if (e.target !== stageRef.current) {
+      return;
+    }
+    
     const stage = e.target as Konva.Stage;
     setStageX(stage.x());
     setStageY(stage.y());
