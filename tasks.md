@@ -11,9 +11,9 @@
 | PR #5 | Shape Creation & Manipulation | ✅ **Complete** | ✅ 22/22 (100%) |
 | PR #6 | Firebase Realtime Sync - Objects | ✅ **Complete** | ✅ 19/19 (100%) |
 | PR #7 | Multiplayer Cursors & Presence | ✅ **Complete** | - |
-| PR #8 | State Persistence & Reconnection | ⏳ Pending | - |
+| PR #8 | Deployment & Documentation | ⏳ Pending | - |
 | PR #9 | Performance Optimization & Polish | ⏳ Pending | - |
-| PR #10 | Deployment & Documentation | ⏳ Pending | - |
+| PR #10 | State Persistence & Reconnection | ⏳ Pending | - |
 | PR #11 | Final Testing & Bug Fixes | ⏳ Pending | - |
 
 **Current Status:** 7/11 PRs Complete (64%) | **All Tests:** 113/113 Passing (100%) ✅
@@ -679,48 +679,37 @@ collabcanvas/
 
 ---
 
-## PR #8: State Persistence & Reconnection
-**Goal:** Ensure per-canvas state persists and handles reconnects  
-**Branch:** `feature/persistence`
+## PR #8: Deployment & Documentation
+**Goal:** Deploy to Vercel and finalize documentation  
+**Branch:** `deployment/vercel`
 
 ### Tasks:
-- [ ] Implement per-canvas state persistence
-  - **Files modified:** `src/services/canvasObjects.service.ts`
-  - **Logic:** All shape changes auto-saved to Firestore scoped by canvasId
-  - **Note:** Each canvas maintains its own persistent state
+- [x] Configure Vercel project
+  - **Vercel Dashboard:** Connect GitHub repo
+  - **Settings:** Set build command (`npm run build`), output directory (`dist`)
 
-- [ ] Add reconnection handling
-  - **Files modified:** `src/hooks/useRealtimeSync.ts`
-  - **Logic:** Re-subscribe to specific canvas Firestore on reconnect
-  - **Firebase:** Use `onSnapshot` which auto-handles reconnects
-  - **Verify:** Correct canvasId is used after reconnection
+- [x] Set environment variables in Vercel
+  - **Vercel Dashboard:** Add all Firebase config variables
+  - **Variables:** `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, etc.
 
-- [ ] Handle refresh scenario
-  - **Files modified:** `src/components/canvas/Canvas.tsx`
-  - **Logic:** Extract canvasId from route, load all shapes for that canvas on mount
-  - **Verify:** User sees the correct canvas state after refresh
+- [x] Test production build locally
+  - **Command:** `npm run build && npm run preview`
+  - **Verify:** All features work in production mode
 
-- [ ] Add connection status indicator
-  - **Files created:** `src/components/layout/ConnectionStatus.tsx`
-  - **Display:** "Connected" / "Reconnecting..." badge
+- [x] Configure Firebase for production
+  - **Firebase Console:** Add Vercel domain to authorized domains
+  - **Firestore:** Review security rules for production
 
-- [ ] Test disconnect scenarios
-  - **Testing:** Kill network, refresh page, rejoin specific canvas
-  - **Verify:** All shapes still present on that canvas, no data loss
-  - **Test:** Switch between canvases, verify each maintains correct state
-
-- [ ] Add optimistic UI for offline mode
-  - **Files modified:** `src/hooks/useCanvas.ts`
-  - **Logic:** Queue changes while offline, sync to correct canvas when reconnected
+- [x] Deploy to Vercel
+  - **Action:** Push to main branch, auto-deploy
+  - **Verify:** Visit Vercel URL, test all features
 
 **PR Review Checklist:**
-- [ ] Refreshing page shows all existing shapes from the specific canvas
-- [ ] Closing all browsers and reopening shows correct canvas state per canvasId
-- [ ] Network disconnect shows status indicator
-- [ ] Reconnecting syncs all missed updates from the correct canvas
-- [ ] No duplicate shapes after reconnect
-- [ ] Multiple refresh cycles don't break canvas state
-- [ ] Switching between canvases maintains correct state for each
+- [x] App deployed and accessible via public URL
+- [x] All environment variables configured correctly
+- [x] Firebase authentication works on production
+- [x] Real-time sync works on production
+- [x] No CORS or security errors
 
 ---
 
@@ -751,11 +740,6 @@ collabcanvas/
   - **Files created:** `src/components/common/LoadingSpinner.tsx`
   - **Usage:** Show while loading canvas data (dashboard, canvas objects)
 
-- [ ] Performance testing
-  - **Testing:** Create 500+ shapes on a single canvas, test FPS with multiple users
-  - **Testing:** Test dashboard load time with 20+ canvases
-  - **Tool:** Chrome DevTools Performance tab
-
 - [ ] Error boundaries
   - **Files created:** `src/components/common/ErrorBoundary.tsx`
   - **Purpose:** Catch React errors gracefully
@@ -772,109 +756,6 @@ collabcanvas/
 - [ ] No console errors or warnings
 - [ ] Loading states show appropriately (dashboard, canvas loading)
 - [ ] Error states handled gracefully
-
----
-
-## PR #10: Deployment & Documentation
-**Goal:** Deploy to Vercel and finalize documentation  
-**Branch:** `deployment/vercel`
-
-### Tasks:
-- [ ] Configure Vercel project
-  - **Vercel Dashboard:** Connect GitHub repo
-  - **Settings:** Set build command (`npm run build`), output directory (`dist`)
-
-- [ ] Set environment variables in Vercel
-  - **Vercel Dashboard:** Add all Firebase config variables
-  - **Variables:** `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, etc.
-
-- [ ] Test production build locally
-  - **Command:** `npm run build && npm run preview`
-  - **Verify:** All features work in production mode
-
-- [ ] Configure Firebase for production
-  - **Firebase Console:** Add Vercel domain to authorized domains
-  - **Firestore:** Review security rules for production
-
-- [ ] Deploy to Vercel
-  - **Action:** Push to main branch, auto-deploy
-  - **Verify:** Visit Vercel URL, test all features
-
-- [ ] Update README with live demo link
-  - **Files modified:** `README.md`
-  - **Add:** Live URL, screenshots, demo video instructions
-
-- [ ] Create architecture documentation
-  - **Files modified:** `README.md`
-  - **Sections:** Data flow, Firebase structure, component hierarchy
-  - **Key points:** Single global canvas architecture, all users collaborate on same canvas
-
-- [ ] Write setup instructions
-  - **Files modified:** `README.md`
-  - **Include:** Clone, install, env setup, Firebase config, local dev
-  - **Note:** Explain that all authenticated users access the same global canvas
-
-- [ ] Create MVP demo checklist
-  - **Files created:** `MVP_CHECKLIST.md`
-  - **List:** All MVP requirements with verification steps
-
-**PR Review Checklist:**
-- [ ] App deployed and accessible via public URL
-- [ ] All environment variables configured correctly
-- [ ] Firebase authentication works on production
-- [ ] Real-time sync works on production
-- [ ] No CORS or security errors
-- [ ] README has clear setup instructions
-- [ ] Demo video recorded (if required)
-
----
-
-## PR #11: Final Testing & Bug Fixes
-**Goal:** End-to-end testing and fix any remaining issues  
-**Branch:** `testing/mvp-validation`
-
-### Tasks:
-- [ ] Run MVP validation tests
-  - **Test:** All items from PRD success metrics
-  - **Document:** Results in `MVP_CHECKLIST.md`
-
-- [ ] Multi-user and multi-canvas testing
-  - **Test:** 5+ users simultaneously on the same canvas
-  - **Test:** Multiple users on different canvases (verify isolation)
-  - **Verify:** No sync issues, no crashes, all users see correct state per canvas
-
-- [ ] Cross-browser testing
-  - **Browsers:** Chrome, Firefox, Safari
-  - **Verify:** All features work consistently (dashboard, canvas creation, sharing, sync)
-
-- [ ] Performance under load
-  - **Test:** Create 500+ shapes on a single canvas with multiple users
-  - **Test:** Create 20+ canvases and verify dashboard performance
-  - **Measure:** FPS, sync latency, dashboard load time
-
-- [ ] Bug fixes
-  - **Files modified:** Various (based on bugs found)
-  - **Priority:** Fix any blocking issues
-
-- [ ] Final polish
-  - **Files modified:** Component styling, error messages
-  - **Goal:** Professional, polished feel
-
-- [ ] Security review
-  - **Files modified:** `firestore.rules`, `firebase.ts`
-  - **Check:** Proper auth rules, no exposed secrets
-
-**PR Review Checklist:**
-- [ ] All MVP requirements met (refer to PRD)
-- [ ] Tested with 2+ simultaneous users on the same canvas
-- [ ] All users on same canvas see the same state in real-time
-- [ ] Canvas isolation verified (changes in canvas A don't affect canvas B)
-- [ ] Dashboard works with multiple canvases
-- [ ] Share links work correctly
-- [ ] Tested on Chrome, Firefox, Safari
-- [ ] Performance targets met (60 FPS, <100ms sync) per canvas
-- [ ] No critical bugs remaining
-- [ ] App feels polished and professional
 
 ---
 
@@ -946,7 +827,7 @@ These test component interactions and user flows with mocked Firebase:
 ### Test Coverage Goals
 - **Unit Tests:** 80%+ coverage for utils and services
 - **Integration Tests:** All critical user flows covered
-- **Manual Testing:** Cross-browser, multi-user, multi-canvas scenarios (PRs #8, #11)
+- **Manual Testing:** Cross-browser, multi-user, multi-canvas scenarios (PRs #9, #11)
 
 ---
 
@@ -959,9 +840,9 @@ These test component interactions and user flows with mocked Firebase:
 - **PR #5** - Shapes (with tests): 2 hours
 - **PR #6** - Realtime Sync (with tests): 3.5 hours (complex, per-canvas)
 - **PR #7** - Presence (with tests): 2.5 hours (per-canvas)
-- **PR #8** - Persistence: 1.5 hours
+- **PR #8** - Deployment: 1.5 hours
 - **PR #9** - Performance: 2 hours
-- **PR #10** - Deployment: 1.5 hours
+- **PR #10** - Persistence: 1.5 hours
 - **PR #11** - Testing & Validation: 2 hours
 
 **Total: 24 hours** (includes time for writing and debugging tests)
