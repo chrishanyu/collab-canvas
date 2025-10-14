@@ -28,6 +28,10 @@ export const mockGetDocs = vi.fn();
 export const mockCollection = vi.fn();
 export const mockQuery = vi.fn();
 export const mockWhere = vi.fn();
+export const mockUpdateDoc = vi.fn();
+export const mockDeleteDoc = vi.fn();
+export const mockOnSnapshot = vi.fn();
+export const mockOrderBy = vi.fn();
 export const mockServerTimestamp = vi.fn(() => ({ _seconds: Date.now() / 1000 }));
 
 // Mock Timestamp class
@@ -73,9 +77,13 @@ vi.mock('firebase/firestore', () => ({
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
   getDoc: (...args: unknown[]) => mockGetDoc(...args),
   getDocs: (...args: unknown[]) => mockGetDocs(...args),
+  updateDoc: (...args: unknown[]) => mockUpdateDoc(...args),
+  deleteDoc: (...args: unknown[]) => mockDeleteDoc(...args),
+  onSnapshot: (...args: unknown[]) => mockOnSnapshot(...args),
   collection: (...args: unknown[]) => mockCollection(...args),
   query: (...args: unknown[]) => mockQuery(...args),
   where: (...args: unknown[]) => mockWhere(...args),
+  orderBy: (...args: unknown[]) => mockOrderBy(...args),
   serverTimestamp: () => mockServerTimestamp(),
   Timestamp: MockTimestamp,
   getFirestore: vi.fn(() => mockDb),
@@ -97,9 +105,13 @@ export const resetAllMocks = () => {
   mockDoc.mockReset();
   mockGetDoc.mockReset();
   mockGetDocs.mockReset();
+  mockUpdateDoc.mockReset();
+  mockDeleteDoc.mockReset();
+  mockOnSnapshot.mockReset();
   mockCollection.mockReset();
   mockQuery.mockReset();
   mockWhere.mockReset();
+  mockOrderBy.mockReset();
   mockAuth.currentUser = null;
 };
 

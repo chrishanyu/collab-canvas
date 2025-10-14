@@ -128,10 +128,109 @@ npm run test -- --coverage
 - Real-time sync and presence are isolated per canvas
 
 ### Firebase Collections
-- `canvases` - Canvas metadata (name, owner, timestamps)
-- `canvas-objects/{canvasId}/objects` - Canvas objects per canvas
-- `user-canvases/{userId}/canvases` - User's accessible canvases
-- `presence/{canvasId}/users` - Per-canvas user presence
+
+#### 1. `canvases` Collection
+Stores metadata for each canvas.
+
+**Document Path:** `/canvases/{canvasId}`
+
+**Fields:**
+- `id` (string) - Unique canvas identifier (same as document ID)
+- `name` (string) - Canvas title/name
+- `ownerId` (string) - User ID of canvas creator
+- `ownerName` (string) - Display name of owner
+- `createdAt` (timestamp) - Canvas creation time
+- `updatedAt` (timestamp) - Last modification time
+
+**Usage:** Displayed in dashboard, used for canvas metadata loading
+
+---
+
+#### 2. `canvas-objects` Collection (Nested Structure)
+Stores all shapes and objects for each canvas. Uses a nested subcollection structure to isolate objects per canvas.
+
+**Document Path:** `/canvas-objects/{canvasId}/objects/{objectId}`
+
+**Fields:**
+- `id` (string) - Unique object identifier (same as document ID)
+- `type` (string) - Shape type: `'rectangle'`, `'circle'`, `'text'`
+- `x` (number) - X coordinate position on canvas
+- `y` (number) - Y coordinate position on canvas
+- `width` (number) - Object width in pixels
+- `height` (number) - Object height in pixels
+- `fill` (string) - Fill color (hex or rgba string)
+- `createdBy` (string) - User ID who created the object
+- `createdAt` (timestamp) - Object creation time
+- `updatedAt` (timestamp) - Last update time (for position changes, etc.)
+
+**Structure Notes:**
+- Objects are scoped per `canvasId` for complete isolation
+- Each canvas has its own `objects` subcollection
+- Changes to canvas A never affect canvas B
+- Firestore automatically creates collections on first write
+
+**Example Document:**
+```javascript
+// Path: /canvas-objects/abc123/objects/obj-xyz789
+{
+  id: "obj-xyz789",
+  type: "rectangle",
+  x: 150,
+  y: 200,
+  width: 100,
+  height: 80,
+  fill: "#3B82F6",
+  createdBy: "user-123",
+  createdAt: Timestamp(2025, 10, 14, 10, 30, 0),
+  updatedAt: Timestamp(2025, 10, 14, 10, 35, 0)
+}
+```
+
+**Querying:**
+```javascript
+// Get all objects for a specific canvas
+const objectsRef = collection(db, 'canvas-objects', canvasId, 'objects');
+const objectsSnapshot = await getDocs(objectsRef);
+
+// Real-time listener for canvas objects
+onSnapshot(objectsRef, (snapshot) => {
+  const objects = snapshot.docs.map(doc => doc.data());
+  // Update local state with synced objects
+});
+```
+
+---
+
+#### 3. `user-canvases` Collection (Nested Structure)
+Tracks which canvases each user has accessed for dashboard display.
+
+**Document Path:** `/user-canvases/{userId}/canvases/{canvasId}`
+
+**Fields:**
+- `canvasId` (string) - Reference to canvas document
+- `accessedAt` (timestamp) - When user first accessed
+- `role` (string) - `'owner'` or `'collaborator'`
+
+**Usage:** Dashboard queries this to show all canvases a user can access
+
+---
+
+#### 4. `presence` Collection (Nested Structure)
+Stores currently active users and their cursor positions per canvas.
+
+**Document Path:** `/presence/{canvasId}/users/{userId}`
+
+**Fields:**
+- `userId` (string) - User ID
+- `displayName` (string) - User's display name
+- `cursorX` (number) - Cursor X position
+- `cursorY` (number) - Cursor Y position
+- `color` (string) - Assigned cursor color
+- `lastSeen` (timestamp) - Last activity timestamp
+
+**Cleanup:** Automatically removed on disconnect using Firebase `onDisconnect()`
+
+**Isolation:** Each canvas has its own presence subcollection
 
 ### Real-Time Sync
 - Uses Firestore real-time listeners
