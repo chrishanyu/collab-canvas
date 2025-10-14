@@ -4,13 +4,13 @@ import { useAuth } from '../../hooks/useAuth';
 import { getCanvasById, updateCanvasAccess } from '../../services/canvas.service';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { ErrorAlert } from '../common/ErrorAlert';
-import { CanvasPlaceholder } from './CanvasPlaceholder';
+import { Canvas } from './Canvas';
 
 /**
  * CanvasWrapper handles canvas access logic:
  * - Checks if canvas exists
  * - Adds canvas to user's access list if not already present
- * - Loads canvas and passes to actual Canvas component
+ * - Renders the Canvas component
  */
 export const CanvasWrapper: React.FC = () => {
   const { canvasId } = useParams<{ canvasId: string }>();
@@ -77,7 +77,6 @@ export const CanvasWrapper: React.FC = () => {
     );
   }
 
-  // TODO: Replace CanvasPlaceholder with actual Canvas component in PR #4
-  return <CanvasPlaceholder />;
+  return <Canvas />;
 };
 
