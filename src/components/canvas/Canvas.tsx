@@ -35,13 +35,10 @@ const MAX_GRID_DOTS = 10000; // Safety limit to prevent performance issues
  * Performance Optimizations:
  * - Viewport virtualization: Only renders shapes visible in current viewport (critical for 500+ shapes)
  * - Shape memoization: Prevents unnecessary re-renders with React.memo
- * - Grid layer caching: Static grid is cached to reduce draw calls
  * - Memoized grid dots: Grid only recalculates when viewport changes
  * - Viewport culling: Only visible grid dots are rendered
  * - Optimistic updates: Shape changes appear instantly, sync in background
  * - Stable realtime sync: Prevents unnecessary Firebase re-subscriptions
- * 
- * Note: Shape layer is NOT cached to preserve interactivity (drag, click, etc.)
  * 
  * Target: 60 FPS with 500+ shapes ✅
  */
@@ -49,9 +46,6 @@ export const Canvas: React.FC = () => {
   const { canvasId } = useParams<{ canvasId: string }>();
   const { currentUser } = useAuth();
   const stageRef = useRef<Konva.Stage>(null);
-  
-  // Layer ref for grid caching optimization
-  const gridLayerRef = useRef<Konva.Layer>(null);
 
   const [canvas, setCanvas] = useState<CanvasType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -450,20 +444,6 @@ export const Canvas: React.FC = () => {
     return visible;
   }, [shapes, stageScale, stageX, stageY, stageWidth, actualStageHeight, selectedShapeId]);
 
-  // Layer caching optimization: Cache grid layer when it changes
-  // The grid is relatively static (only changes on pan/zoom), so caching improves performance
-  // NOTE: We only cache the grid layer (not shapes) because caching interactive layers
-  // can interfere with event handling (clicks, drags, etc.)
-  useEffect(() => {
-    const gridLayer = gridLayerRef.current;
-    if (!gridLayer) return;
-
-    // Clear any existing cache and redraw
-    gridLayer.clearCache();
-    gridLayer.cache();
-    gridLayer.batchDraw();
-  }, [gridDots]); // Recache when grid dots change (pan/zoom/resize)
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -545,7 +525,7 @@ export const Canvas: React.FC = () => {
           onMouseUp={handleStageMouseUp}
         >
           {/* Background Grid Layer - scales with zoom */}
-          <Layer ref={gridLayerRef} listening={false}>
+          <Layer listening={false}>
             {gridDots}
           </Layer>
           
