@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface FormInputProps {
-  id: string;
+  id?: string;
   label: string;
   type: string;
   value: string;
@@ -10,6 +10,7 @@ interface FormInputProps {
   placeholder?: string;
   autoComplete?: string;
   disabled?: boolean;
+  autoFocus?: boolean;
 }
 
 export const FormInput: React.FC<FormInputProps> = ({
@@ -22,17 +23,21 @@ export const FormInput: React.FC<FormInputProps> = ({
   placeholder,
   autoComplete,
   disabled = false,
+  autoFocus = false,
 }) => {
+  // Generate a unique ID if not provided
+  const inputId = id || `input-${label.toLowerCase().replace(/\s+/g, '-')}`;
+
   return (
     <div>
       <label
-        htmlFor={id}
+        htmlFor={inputId}
         className="block text-sm font-medium text-gray-700 mb-2"
       >
         {label}
       </label>
       <input
-        id={id}
+        id={inputId}
         type={type}
         autoComplete={autoComplete}
         value={value}
@@ -42,6 +47,7 @@ export const FormInput: React.FC<FormInputProps> = ({
         }`}
         placeholder={placeholder}
         disabled={disabled}
+        autoFocus={autoFocus}
       />
       {error && (
         <p className="mt-2 text-sm text-red-600 flex items-center">

@@ -1,5 +1,25 @@
 # CollabCanvas MVP - Task List & PR Breakdown
 
+## 📊 Overall Progress Tracker
+
+| PR # | Feature | Status | Tests |
+|------|---------|--------|-------|
+| PR #1 | Project Setup & Configuration | ✅ **Complete** | N/A |
+| PR #2 | Firebase Authentication System | ✅ **Complete** | ✅ 24/24 (100%) |
+| PR #3 | Dashboard & Canvas Management | ✅ **Complete** | ✅ 32/32 (100%) |
+| PR #4 | Basic Canvas with Pan & Zoom | ⏳ Pending | - |
+| PR #5 | Shape Creation & Manipulation | ⏳ Pending | - |
+| PR #6 | Firebase Realtime Sync - Objects | ⏳ Pending | - |
+| PR #7 | Multiplayer Cursors & Presence | ⏳ Pending | - |
+| PR #8 | State Persistence & Reconnection | ⏳ Pending | - |
+| PR #9 | Performance Optimization & Polish | ⏳ Pending | - |
+| PR #10 | Deployment & Documentation | ⏳ Pending | - |
+| PR #11 | Final Testing & Bug Fixes | ⏳ Pending | - |
+
+**Current Status:** 3/11 PRs Complete (27%) | **All Tests:** 56/56 Passing (100%) ✅
+
+---
+
 ## Architecture Note
 **Multi-Canvas Architecture:** This MVP uses a multi-canvas project management system. Users can create unlimited canvases, share them via links, and collaborate in real-time. Each canvas is isolated with its own objects, presence, and real-time sync. Users access a dashboard after login where they can create new canvases or view existing ones.
 
@@ -242,82 +262,87 @@ collabcanvas/
 **Branch:** `feature/dashboard`
 
 ### Tasks:
-- [ ] Create canvas service for metadata
-  - **Files created:** `src/services/canvas.service.js`
+- [x] Create canvas service for metadata
+  - **Files created:** `src/services/canvas.service.ts`
   - **Functions:** `createCanvas()`, `getCanvasById()`, `getUserCanvases()`, `updateCanvasAccess()`, `generateShareLink()`
   - **Note:** Manages canvas metadata (name, owner, timestamps), not canvas objects
 
-- [ ] **UNIT TEST: Canvas metadata service**
-  - **Files created:** `tests/unit/canvas.service.test.js`
-  - **Test cases:**
-    - `createCanvas()` creates canvas with correct metadata structure
-    - `getCanvasById()` retrieves canvas by ID
-    - `getUserCanvases()` returns all canvases for a user
-    - `updateCanvasAccess()` adds canvas to user's access list
-    - Canvas IDs are unique and valid
+- [x] **UNIT TEST: Canvas metadata service**
+  - **Files created:** `tests/unit/canvas.service.test.ts`
+  - **Test cases:** ✅ 22/22 passing (100%)
+    - `createCanvas()` creates canvas with correct metadata structure ✓
+    - `getCanvasById()` retrieves canvas by ID ✓
+    - `getUserCanvases()` returns all canvases for a user ✓
+    - `updateCanvasAccess()` adds canvas to user's access list ✓
+    - Canvas IDs are unique and valid ✓
+    - Default naming, error handling, batching for >10 canvases ✓
   - **Mocking:** Mock Firestore operations
-  - **Command:** `npm run test tests/unit/canvas.service.test.js`
+  - **Command:** `npm run test tests/unit/canvas.service.test.ts`
 
-- [ ] Create Dashboard component
-  - **Files created:** `src/components/dashboard/Dashboard.jsx`
+- [x] Create Dashboard component
+  - **Files created:** `src/components/dashboard/Dashboard.tsx`
   - **Features:** Display user's canvases, "Create New Canvas" button, empty state if no canvases
   - **Layout:** Grid of canvas cards
 
-- [ ] Create CanvasCard component
-  - **Files created:** `src/components/dashboard/CanvasCard.jsx`
+- [x] Create CanvasCard component
+  - **Files created:** `src/components/dashboard/CanvasCard.tsx`
   - **Display:** Canvas name, owner, created date, last modified, thumbnail (placeholder for now)
   - **Actions:** Click to open canvas, copy share link button
 
-- [ ] Create CreateCanvasModal component
-  - **Files created:** `src/components/dashboard/CreateCanvasModal.jsx`
+- [x] Create CreateCanvasModal component
+  - **Files created:** `src/components/dashboard/CreateCanvasModal.tsx`
   - **Fields:** Canvas name input
   - **Action:** Creates canvas in Firestore, redirects to new canvas
 
-- [ ] Create ShareLinkModal component
-  - **Files created:** `src/components/dashboard/ShareLinkModal.jsx`
+- [x] Create ShareLinkModal component
+  - **Files created:** `src/components/dashboard/ShareLinkModal.tsx`
   - **Display:** Full shareable URL, copy to clipboard button
   - **Format:** `https://app-url.com/canvas/:canvasId`
 
-- [ ] Implement canvas creation logic
-  - **Files modified:** `src/components/dashboard/Dashboard.jsx`
+- [x] Implement canvas creation logic
+  - **Files modified:** `src/components/dashboard/Dashboard.tsx`
   - **Flow:** Click "Create" → modal opens → enter name → create in Firestore → add to user access → redirect to canvas
 
-- [ ] Implement share link generation
-  - **Files modified:** `src/components/dashboard/CanvasCard.jsx`
+- [x] Implement share link generation
+  - **Files modified:** `src/components/dashboard/CanvasCard.tsx`
   - **Logic:** Generate link with canvas ID, copy to clipboard with feedback
 
-- [ ] Handle canvas access via shared link
-  - **Files modified:** `src/App.jsx`
+- [x] Handle canvas access via shared link
+  - **Files modified:** `src/App.tsx`, **Files created:** `src/components/canvas/CanvasWrapper.tsx`
   - **Logic:** When user navigates to `/canvas/:canvasId`, add canvas to their access list if not already present
 
-- [ ] **INTEGRATION TEST: Dashboard flow**
-  - **Files created:** `tests/integration/dashboard-flow.test.jsx`
-  - **Test cases:**
-    - User sees empty dashboard with "Create" button on first login
-    - Clicking "Create" opens modal and creates canvas
-    - New canvas appears in dashboard
-    - Canvas card displays correct metadata
-    - Clicking canvas card navigates to canvas
-    - Share link button copies correct URL
-    - Multiple canvases can be created
+- [x] **INTEGRATION TEST: Dashboard flow**
+  - **Files created:** `tests/integration/dashboard-flow.test.tsx`
+  - **Test cases:** ✅ 10/10 passing (100%)
+    - User sees empty dashboard with "Create" button on first login ✓
+    - Clicking "Create" opens modal and creates canvas ✓
+    - New canvas appears in dashboard ✓
+    - Canvas card displays correct metadata ✓
+    - Clicking canvas card navigates to canvas ✓
+    - Share link button copies correct URL ✓
+    - Multiple canvases can be created ✓
+    - Loading spinner works correctly ✓
+    - Default canvas naming works ✓
   - **Purpose:** Verify full dashboard and canvas management flow
-  - **Command:** `npm run test tests/integration/dashboard-flow.test.jsx`
+  - **Command:** `npm run test tests/integration/dashboard-flow.test.tsx`
 
-- [ ] Update routing in App.jsx
-  - **Files modified:** `src/App.jsx`
+- [x] Update routing in App.tsx
+  - **Files modified:** `src/App.tsx`
   - **Routes:** `/dashboard` (protected), `/canvas/:canvasId` (protected)
   - **Logic:** Protected routes require authentication
 
 **PR Review Checklist:**
-- [ ] Unit tests pass for canvas service
-- [ ] Integration tests pass for dashboard flow
-- [ ] Users see dashboard after login
-- [ ] "Create New Canvas" button works
-- [ ] New canvases appear in dashboard with correct metadata
-- [ ] Clicking canvas navigates to `/canvas/:canvasId`
-- [ ] Share link generates and copies to clipboard
-- [ ] Accessing `/canvas/:canvasId` via link adds canvas to user's dashboard
-- [ ] Multiple canvases can be created independently
+- [x] Unit tests pass for canvas service - ✅ 22/22 passing (100%)
+- [x] Integration tests pass for dashboard flow - ✅ 10/10 passing (100%)
+- [x] Users see dashboard after login
+- [x] "Create New Canvas" button works
+- [x] New canvases appear in dashboard with correct metadata
+- [x] Clicking canvas navigates to `/canvas/:canvasId`
+- [x] Share link generates and copies to clipboard
+- [x] Accessing `/canvas/:canvasId` via link adds canvas to user's dashboard
+- [x] Multiple canvases can be created independently
+- [x] Accessibility improvements (FormInput, LoadingSpinner)
+- [x] Fixed PR #2 auth-flow tests for compatibility with real Dashboard
 
 ---
 
@@ -327,57 +352,57 @@ collabcanvas/
 
 ### Tasks:
 - [ ] Create canvas constants
-  - **Files created:** `src/utils/constants.js`
+  - **Files created:** `src/utils/constants.ts`
   - **Constants:** `CANVAS_WIDTH`, `CANVAS_HEIGHT`, `MIN_ZOOM`, `MAX_ZOOM`, `ZOOM_SPEED`
   - **Note:** Same constants used for all canvases
 
 - [ ] Create canvas helper utilities
-  - **Files created:** `src/utils/canvasHelpers.js`
+  - **Files created:** `src/utils/canvasHelpers.ts`
   - **Functions:** `getPointerPosition()`, `getRelativePointerPosition()`, `constrainZoom()`, `generateUniqueId()`
 
 - [ ] **UNIT TEST: Canvas helper functions**
-  - **Files created:** `tests/unit/canvasHelpers.test.js`
+  - **Files created:** `tests/unit/canvasHelpers.test.ts`
   - **Test cases:**
     - `constrainZoom()` keeps zoom within min/max bounds
     - `constrainZoom()` allows valid zoom values
     - `getRelativePointerPosition()` calculates correct canvas coordinates
     - `generateUniqueId()` produces unique IDs
   - **Purpose:** Verify core canvas math is correct
-  - **Command:** `npm run test tests/unit/canvasHelpers.test.js`
+  - **Command:** `npm run test tests/unit/canvasHelpers.test.ts`
 
 - [ ] Create Canvas component
-  - **Files created:** `src/components/canvas/Canvas.jsx`
+  - **Files created:** `src/components/canvas/Canvas.tsx`
   - **Setup:** Konva Stage and Layer
   - **Features:** Basic rendering
   - **Routing:** Extract `canvasId` from URL params using `useParams()`
   - **Data:** Load canvas metadata from Firestore using canvasId
 
 - [ ] Implement pan functionality
-  - **Files modified:** `src/components/canvas/Canvas.jsx`
+  - **Files modified:** `src/components/canvas/Canvas.tsx`
   - **Method:** Drag Stage to pan
   - **Event:** `onDragEnd` to save position
 
 - [ ] Implement zoom functionality
-  - **Files modified:** `src/components/canvas/Canvas.jsx`
+  - **Files modified:** `src/components/canvas/Canvas.tsx`
   - **Method:** Mouse wheel zoom with pointer as center
   - **Event:** `onWheel` handler
   - **Constraints:** Min/max zoom limits
 
 - [ ] Add canvas toolbar
-  - **Files created:** `src/components/canvas/CanvasToolbar.jsx`
+  - **Files created:** `src/components/canvas/CanvasToolbar.tsx`
   - **Buttons:** Reset view, zoom in, zoom out
   - **Styling:** Tailwind fixed toolbar
 
 - [ ] Create Layout component
-  - **Files created:** `src/components/layout/Layout.jsx`, `Header.jsx`
+  - **Files created:** `src/components/layout/Layout.tsx`, `Header.tsx`
   - **Purpose:** App shell with header and canvas area
 
-- [ ] Update App.jsx with canvas
-  - **Files modified:** `src/App.jsx`
+- [ ] Update App.tsx with canvas
+  - **Files modified:** `src/App.tsx`
   - **Logic:** Show canvas after authentication
 
 - [ ] Test performance (60 FPS)
-  - **Files modified:** `src/components/canvas/Canvas.jsx`
+  - **Files modified:** `src/components/canvas/Canvas.tsx`
   - **Add:** FPS counter (dev only)
 
 **PR Review Checklist:**
@@ -398,47 +423,47 @@ collabcanvas/
 
 ### Tasks:
 - [ ] Create Shape component
-  - **Files created:** `src/components/canvas/Shape.jsx`
+  - **Files created:** `src/components/canvas/Shape.tsx`
   - **Props:** `shape` object (id, type, x, y, width, height, fill)
   - **Support:** Rectangle rendering with Konva.Rect
 
 - [ ] Add shape creation to toolbar
-  - **Files modified:** `src/components/canvas/CanvasToolbar.jsx`
+  - **Files modified:** `src/components/canvas/CanvasToolbar.tsx`
   - **Button:** "Add Rectangle"
   - **Action:** Trigger shape creation
 
 - [ ] Implement shape creation logic
-  - **Files modified:** `src/components/canvas/Canvas.jsx`
+  - **Files modified:** `src/components/canvas/Canvas.tsx`
   - **Method:** `createShape()` - adds shape at center or click position
   - **State:** Local shapes array
 
 - [ ] Add shape selection
-  - **Files modified:** `src/components/canvas/Shape.jsx`, `Canvas.jsx`
+  - **Files modified:** `src/components/canvas/Shape.tsx`, `Canvas.tsx`
   - **Event:** `onClick` handler
   - **State:** `selectedShapeId`
   - **Visual:** Highlight selected shape (border or transformer)
 
 - [ ] Implement shape dragging
-  - **Files modified:** `src/components/canvas/Shape.jsx`
+  - **Files modified:** `src/components/canvas/Shape.tsx`
   - **Props:** `draggable={true}`
   - **Event:** `onDragEnd` to update position
   - **Callback:** Pass position back to parent
 
 - [ ] Add visual feedback
-  - **Files modified:** `src/components/canvas/Shape.jsx`
+  - **Files modified:** `src/components/canvas/Shape.tsx`
   - **States:** Hover effect, selection highlight
   - **Cursor:** Pointer on hover
 
 - [ ] Create canvas context
-  - **Files created:** `src/context/CanvasContext.jsx`
+  - **Files created:** `src/context/CanvasContext.tsx`
   - **State:** `shapes`, `selectedShapeId`, `setShapes`, `selectShape`
 
 - [ ] Create canvas hook
-  - **Files created:** `src/hooks/useCanvas.js`
+  - **Files created:** `src/hooks/useCanvas.ts`
   - **Methods:** `createShape()`, `updateShape()`, `deleteShape()`, `selectShape()`
 
 - [ ] **INTEGRATION TEST: Canvas operations**
-  - **Files created:** `tests/integration/canvas-operations.test.jsx`
+  - **Files created:** `tests/integration/canvas-operations.test.tsx`
   - **Test cases:**
     - Clicking "Add Rectangle" creates a shape on canvas
     - Created shape has correct default properties (size, color, position)
@@ -448,7 +473,7 @@ collabcanvas/
     - Multiple shapes can exist simultaneously
     - Creating 20 shapes maintains performance
   - **Purpose:** Verify shape creation and manipulation works end-to-end
-  - **Command:** `npm run test tests/integration/canvas-operations.test.jsx`
+  - **Command:** `npm run test tests/integration/canvas-operations.test.tsx`
 
 **PR Review Checklist:**
 - [ ] Integration tests pass for canvas operations
@@ -475,12 +500,12 @@ collabcanvas/
   - **Files created:** Data model documentation in `README.md`
 
 - [ ] Create canvas objects service
-  - **Files created:** `src/services/canvasObjects.service.js`
+  - **Files created:** `src/services/canvasObjects.service.ts`
   - **Functions:** `subscribeToCanvasObjects(canvasId)`, `createShape(canvasId, shape)`, `updateShape(canvasId, shapeId, updates)`, `deleteShape(canvasId, shapeId)`
   - **Note:** All functions require canvasId parameter to scope operations
 
 - [ ] **UNIT TEST: Canvas objects service functions**
-  - **Files created:** `tests/unit/canvasObjects.service.test.js`
+  - **Files created:** `tests/unit/canvasObjects.service.test.ts`
   - **Test cases:**
     - `createShape(canvasId, shape)` adds shape to correct canvas in Firestore
     - `updateShape(canvasId, shapeId, updates)` modifies existing shape
@@ -489,42 +514,42 @@ collabcanvas/
     - Service handles Firestore errors gracefully
     - Shape IDs are unique and valid
   - **Mocking:** Mock Firestore operations
-  - **Command:** `npm run test tests/unit/canvasObjects.service.test.js`
+  - **Command:** `npm run test tests/unit/canvasObjects.service.test.ts`
 
 - [ ] Create realtime sync hook
-  - **Files created:** `src/hooks/useRealtimeSync.js`
+  - **Files created:** `src/hooks/useRealtimeSync.ts`
   - **Purpose:** Subscribe to specific canvas Firestore changes, update local state
   - **Parameters:** Accepts `canvasId` to subscribe to specific canvas
   - **Methods:** `syncShapes(canvasId)`, handle snapshot listeners per canvas
   - **Note:** Must unsubscribe when canvas changes or component unmounts
 
 - [ ] Integrate Firebase sync into Canvas
-  - **Files modified:** `src/components/canvas/Canvas.jsx`, `src/hooks/useCanvas.js`
+  - **Files modified:** `src/components/canvas/Canvas.tsx`, `src/hooks/useCanvas.ts`
   - **Logic:** Extract canvasId from route, subscribe to that canvas's objects on mount
   - **Cleanup:** Unsubscribe from Firestore when navigating away or unmounting
 
 - [ ] Implement create shape sync
-  - **Files modified:** `src/services/canvasObjects.service.js`, `src/hooks/useCanvas.js`
+  - **Files modified:** `src/services/canvasObjects.service.ts`, `src/hooks/useCanvas.ts`
   - **Flow:** Create shape locally → Write to Firestore with canvasId → All clients viewing same canvas receive update
 
 - [ ] Implement move shape sync
-  - **Files modified:** `src/components/canvas/Shape.jsx`, `src/services/canvasObjects.service.js`
+  - **Files modified:** `src/components/canvas/Shape.tsx`, `src/services/canvasObjects.service.ts`
   - **Flow:** Drag shape → Update Firestore with canvasId on dragEnd → All clients in same canvas receive new position
 
 - [ ] Add optimistic updates
-  - **Files modified:** `src/hooks/useCanvas.js`
+  - **Files modified:** `src/hooks/useCanvas.ts`
   - **Logic:** Update local state immediately, sync to Firebase in background
 
 - [ ] Handle conflicts (last write wins)
-  - **Files modified:** `src/services/canvas.service.js`
+  - **Files modified:** `src/services/canvas.service.ts`
   - **Method:** Use Firestore server timestamps for ordering
 
 - [ ] Add error handling
-  - **Files modified:** `src/hooks/useRealtimeSync.js`
+  - **Files modified:** `src/hooks/useRealtimeSync.ts`
   - **Logic:** Retry failed writes, show error toasts
 
 - [ ] **INTEGRATION TEST: Real-time sync (mock)**
-  - **Files created:** `tests/integration/realtime-sync.test.jsx`
+  - **Files created:** `tests/integration/realtime-sync.test.tsx`
   - **Test cases:**
     - Creating shape triggers Firestore write with correct canvasId
     - Firestore listener receives updates and updates local state for specific canvas
@@ -535,7 +560,7 @@ collabcanvas/
     - All users viewing same canvas see the same state
   - **Mocking:** Mock Firestore snapshot listeners
   - **Purpose:** Verify sync logic without actual Firebase calls
-  - **Command:** `npm run test tests/integration/realtime-sync.test.jsx`
+  - **Command:** `npm run test tests/integration/realtime-sync.test.tsx`
 
 - [ ] Test with multiple browsers and canvases
   - **Testing:** Open 2+ browser windows on same canvas, create/move shapes, verify sync
@@ -568,55 +593,55 @@ collabcanvas/
   - **Files modified:** `README.md` (document data structure)
 
 - [ ] Create presence service
-  - **Files created:** `src/services/presence.service.js`
+  - **Files created:** `src/services/presence.service.ts`
   - **Functions:** `updateCursorPosition(canvasId, userId, x, y)`, `setUserOnline(canvasId, userId)`, `setUserOffline(canvasId, userId)`, `subscribeToPresence(canvasId)`
   - **Note:** All functions require canvasId to scope presence to specific canvas
 
 - [ ] Create Cursor component
-  - **Files created:** `src/components/canvas/Cursor.jsx`
+  - **Files created:** `src/components/canvas/Cursor.tsx`
   - **Props:** `x`, `y`, `name`, `color`
   - **Render:** SVG cursor with name label
 
 - [ ] Create presence hook
-  - **Files created:** `src/hooks/usePresence.js`
+  - **Files created:** `src/hooks/usePresence.ts`
   - **Parameters:** Accepts `canvasId` to track presence for specific canvas
   - **State:** Array of online users with cursor positions for this canvas
   - **Methods:** `updateCursor(x, y)`, `subscribeToUsers(canvasId)`
   - **Cleanup:** Unsubscribe and set user offline when leaving canvas
 
 - [ ] Integrate cursor tracking in Canvas
-  - **Files modified:** `src/components/canvas/Canvas.jsx`
+  - **Files modified:** `src/components/canvas/Canvas.tsx`
   - **Event:** `onMouseMove` to track cursor position
   - **Logic:** Pass canvasId to presence hook
   - **Throttle:** Update Firebase max 60 times/second
 
 - [ ] Render other users' cursors
-  - **Files modified:** `src/components/canvas/Canvas.jsx`
+  - **Files modified:** `src/components/canvas/Canvas.tsx`
   - **Loop:** Map over online users for this canvas, render Cursor component for each
   - **Note:** Only show users in the current canvas
 
 - [ ] Assign unique colors to users
-  - **Files created:** `src/utils/canvasHelpers.js` (add color generator)
+  - **Files created:** `src/utils/canvasHelpers.ts` (add color generator)
   - **Logic:** Deterministic color based on userId
 
 - [ ] Create online users list component
-  - **Files created:** `src/components/presence/OnlineUsers.jsx`
+  - **Files created:** `src/components/presence/OnlineUsers.tsx`
   - **Display:** List of users currently viewing this specific canvas with colored dots
   - **Position:** Fixed sidebar or header
   - **Props:** Receives `canvasId` to display correct users
 
 - [ ] Handle user online/offline status
-  - **Files modified:** `src/hooks/usePresence.js`
+  - **Files modified:** `src/hooks/usePresence.ts`
   - **Logic:** Set online for this canvasId on mount, offline on unmount
   - **Firebase:** Use `onDisconnect()` for automatic cleanup per canvas
   - **Cleanup:** Remove presence when navigating to different canvas
 
 - [ ] Add presence to UserPresence component
-  - **Files created:** `src/components/presence/UserPresence.jsx`
+  - **Files created:** `src/components/presence/UserPresence.tsx`
   - **Purpose:** Wrapper component managing presence logic
 
 - [ ] Optimize cursor updates
-  - **Files modified:** `src/hooks/usePresence.js`
+  - **Files modified:** `src/hooks/usePresence.ts`
   - **Method:** Throttle/debounce cursor position updates
   - **Target:** <50ms latency
 
@@ -639,23 +664,23 @@ collabcanvas/
 
 ### Tasks:
 - [ ] Implement per-canvas state persistence
-  - **Files modified:** `src/services/canvasObjects.service.js`
+  - **Files modified:** `src/services/canvasObjects.service.ts`
   - **Logic:** All shape changes auto-saved to Firestore scoped by canvasId
   - **Note:** Each canvas maintains its own persistent state
 
 - [ ] Add reconnection handling
-  - **Files modified:** `src/hooks/useRealtimeSync.js`
+  - **Files modified:** `src/hooks/useRealtimeSync.ts`
   - **Logic:** Re-subscribe to specific canvas Firestore on reconnect
   - **Firebase:** Use `onSnapshot` which auto-handles reconnects
   - **Verify:** Correct canvasId is used after reconnection
 
 - [ ] Handle refresh scenario
-  - **Files modified:** `src/components/canvas/Canvas.jsx`
+  - **Files modified:** `src/components/canvas/Canvas.tsx`
   - **Logic:** Extract canvasId from route, load all shapes for that canvas on mount
   - **Verify:** User sees the correct canvas state after refresh
 
 - [ ] Add connection status indicator
-  - **Files created:** `src/components/layout/ConnectionStatus.jsx`
+  - **Files created:** `src/components/layout/ConnectionStatus.tsx`
   - **Display:** "Connected" / "Reconnecting..." badge
 
 - [ ] Test disconnect scenarios
@@ -664,7 +689,7 @@ collabcanvas/
   - **Test:** Switch between canvases, verify each maintains correct state
 
 - [ ] Add optimistic UI for offline mode
-  - **Files modified:** `src/hooks/useCanvas.js`
+  - **Files modified:** `src/hooks/useCanvas.ts`
   - **Logic:** Queue changes while offline, sync to correct canvas when reconnected
 
 **PR Review Checklist:**
@@ -684,25 +709,25 @@ collabcanvas/
 
 ### Tasks:
 - [ ] Optimize Konva rendering
-  - **Files modified:** `src/components/canvas/Canvas.jsx`
+  - **Files modified:** `src/components/canvas/Canvas.tsx`
   - **Method:** Add layer caching, limit re-renders
   - **Note:** Critical for canvases with many concurrent users and objects
 
 - [ ] Memoize Shape components
-  - **Files modified:** `src/components/canvas/Shape.jsx`
+  - **Files modified:** `src/components/canvas/Shape.tsx`
   - **Method:** Wrap in `React.memo()`
 
 - [ ] Add virtualization for many shapes
-  - **Files modified:** `src/components/canvas/Canvas.jsx`
+  - **Files modified:** `src/components/canvas/Canvas.tsx`
   - **Logic:** Only render shapes in viewport (if needed for 500+ objects on a canvas)
 
 - [ ] Optimize cursor updates
-  - **Files modified:** `src/hooks/usePresence.js`
+  - **Files modified:** `src/hooks/usePresence.ts`
   - **Method:** Batch cursor updates, reduce Firebase writes per canvas
   - **Note:** Important since multiple users' cursors tracked per canvas
 
 - [ ] Add loading states
-  - **Files created:** `src/components/common/LoadingSpinner.jsx`
+  - **Files created:** `src/components/common/LoadingSpinner.tsx`
   - **Usage:** Show while loading canvas data (dashboard, canvas objects)
 
 - [ ] Performance testing
@@ -711,7 +736,7 @@ collabcanvas/
   - **Tool:** Chrome DevTools Performance tab
 
 - [ ] Error boundaries
-  - **Files created:** `src/components/common/ErrorBoundary.jsx`
+  - **Files created:** `src/components/common/ErrorBoundary.tsx`
   - **Purpose:** Catch React errors gracefully
 
 - [ ] Polish UI/UX
@@ -815,7 +840,7 @@ collabcanvas/
   - **Goal:** Professional, polished feel
 
 - [ ] Security review
-  - **Files modified:** `firestore.rules`, `firebase.js`
+  - **Files modified:** `firestore.rules`, `firebase.ts`
   - **Check:** Proper auth rules, no exposed secrets
 
 **PR Review Checklist:**
@@ -835,40 +860,40 @@ collabcanvas/
 ## Quick Reference: Critical Files by Feature
 
 ### Authentication
-- `src/services/auth.service.js`
-- `src/context/AuthContext.jsx`
-- `src/components/auth/LoginForm.jsx`
-- `src/components/auth/RegisterForm.jsx`
+- `src/services/auth.service.ts`
+- `src/context/AuthContext.tsx`
+- `src/components/auth/LoginForm.tsx`
+- `src/components/auth/RegisterForm.tsx`
 
 ### Dashboard & Canvas Management
-- `src/components/dashboard/Dashboard.jsx`
-- `src/components/dashboard/CanvasCard.jsx`
-- `src/components/dashboard/CreateCanvasModal.jsx`
-- `src/components/dashboard/ShareLinkModal.jsx`
-- `src/services/canvas.service.js` (canvas metadata)
+- `src/components/dashboard/Dashboard.tsx`
+- `src/components/dashboard/CanvasCard.tsx`
+- `src/components/dashboard/CreateCanvasModal.tsx`
+- `src/components/dashboard/ShareLinkModal.tsx`
+- `src/services/canvas.service.ts` (canvas metadata)
 
 ### Canvas Core
-- `src/components/canvas/Canvas.jsx`
-- `src/components/canvas/CanvasToolbar.jsx`
-- `src/utils/canvasHelpers.js`
+- `src/components/canvas/Canvas.tsx`
+- `src/components/canvas/CanvasToolbar.tsx`
+- `src/utils/canvasHelpers.ts`
 
 ### Shapes
-- `src/components/canvas/Shape.jsx`
-- `src/hooks/useCanvas.js`
-- `src/context/CanvasContext.jsx`
+- `src/components/canvas/Shape.tsx`
+- `src/hooks/useCanvas.ts`
+- `src/context/CanvasContext.tsx`
 
 ### Real-Time Sync (Per Canvas)
-- `src/services/canvasObjects.service.js` (canvas objects)
-- `src/hooks/useRealtimeSync.js`
+- `src/services/canvasObjects.service.ts` (canvas objects)
+- `src/hooks/useRealtimeSync.ts`
 
 ### Multiplayer Presence (Per Canvas)
-- `src/services/presence.service.js`
-- `src/hooks/usePresence.js`
-- `src/components/canvas/Cursor.jsx`
-- `src/components/presence/OnlineUsers.jsx`
+- `src/services/presence.service.ts`
+- `src/hooks/usePresence.ts`
+- `src/components/canvas/Cursor.tsx`
+- `src/components/presence/OnlineUsers.tsx`
 
 ### Firebase Config
-- `src/services/firebase.js`
+- `src/services/firebase.ts`
 - `.env.local`
 
 ---
@@ -879,17 +904,17 @@ collabcanvas/
 
 ### Unit Tests (4 files)
 These test pure functions and services in isolation with mocked dependencies:
-1. **`tests/unit/canvasHelpers.test.js`** - Canvas math functions (zoom, coordinates)
-2. **`tests/unit/auth.service.test.js`** - Authentication service methods
-3. **`tests/unit/canvas.service.test.js`** - Canvas metadata service (creation, retrieval, access)
-4. **`tests/unit/canvasObjects.service.test.js`** - Canvas objects service (per-canvas CRUD with canvasId)
+1. **`tests/unit/canvasHelpers.test.ts`** - Canvas math functions (zoom, coordinates)
+2. **`tests/unit/auth.service.test.ts`** - Authentication service methods
+3. **`tests/unit/canvas.service.test.ts`** - Canvas metadata service (creation, retrieval, access)
+4. **`tests/unit/canvasObjects.service.test.ts`** - Canvas objects service (per-canvas CRUD with canvasId)
 
 ### Integration Tests (4 files)
 These test component interactions and user flows with mocked Firebase:
-1. **`tests/integration/auth-flow.test.jsx`** - Complete registration → login → logout flow (redirects to dashboard)
-2. **`tests/integration/dashboard-flow.test.jsx`** - Canvas creation, dashboard display, sharing links
-3. **`tests/integration/canvas-operations.test.jsx`** - Shape creation, selection, and movement on specific canvas
-4. **`tests/integration/realtime-sync.test.jsx`** - Sync logic with mocked Firestore listeners (per-canvas sync and isolation)
+1. **`tests/integration/auth-flow.test.tsx`** - Complete registration → login → logout flow (redirects to dashboard)
+2. **`tests/integration/dashboard-flow.test.tsx`** - Canvas creation, dashboard display, sharing links
+3. **`tests/integration/canvas-operations.test.tsx`** - Shape creation, selection, and movement on specific canvas
+4. **`tests/integration/realtime-sync.test.tsx`** - Sync logic with mocked Firestore listeners (per-canvas sync and isolation)
 
 ### When to Run Tests
 - **During Development:** `npm run test -- --watch` for active test file
@@ -929,7 +954,7 @@ These test component interactions and user flows with mocked Firebase:
 npm run test
 
 # Run specific test file
-npm run test tests/unit/canvasHelpers.test.js
+npm run test tests/unit/canvasHelpers.test.ts
 
 # Run tests in watch mode (for active development)
 npm run test -- --watch

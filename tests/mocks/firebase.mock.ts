@@ -23,7 +23,29 @@ export const mockOnAuthStateChanged = vi.fn();
 // Mock Firestore functions
 export const mockSetDoc = vi.fn();
 export const mockDoc = vi.fn();
+export const mockGetDoc = vi.fn();
+export const mockGetDocs = vi.fn();
+export const mockCollection = vi.fn();
+export const mockQuery = vi.fn();
+export const mockWhere = vi.fn();
 export const mockServerTimestamp = vi.fn(() => ({ _seconds: Date.now() / 1000 }));
+
+// Mock Timestamp class
+export class MockTimestamp {
+  _seconds: number;
+  _nanoseconds: number;
+
+  constructor(seconds: number, nanoseconds: number) {
+    this._seconds = seconds;
+    this._nanoseconds = nanoseconds;
+  }
+
+  toDate(): Date {
+    return new Date(this._seconds * 1000);
+  }
+}
+
+export const mockTimestamp = new MockTimestamp(Date.now() / 1000, 0);
 
 // Mock auth object
 export const mockAuth = {
@@ -49,7 +71,13 @@ vi.mock('firebase/auth', () => ({
 vi.mock('firebase/firestore', () => ({
   doc: (...args: unknown[]) => mockDoc(...args),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
+  getDoc: (...args: unknown[]) => mockGetDoc(...args),
+  getDocs: (...args: unknown[]) => mockGetDocs(...args),
+  collection: (...args: unknown[]) => mockCollection(...args),
+  query: (...args: unknown[]) => mockQuery(...args),
+  where: (...args: unknown[]) => mockWhere(...args),
   serverTimestamp: () => mockServerTimestamp(),
+  Timestamp: MockTimestamp,
   getFirestore: vi.fn(() => mockDb),
 }));
 
@@ -67,6 +95,11 @@ export const resetAllMocks = () => {
   mockOnAuthStateChanged.mockReset();
   mockSetDoc.mockReset();
   mockDoc.mockReset();
+  mockGetDoc.mockReset();
+  mockGetDocs.mockReset();
+  mockCollection.mockReset();
+  mockQuery.mockReset();
+  mockWhere.mockReset();
   mockAuth.currentUser = null;
 };
 

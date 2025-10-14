@@ -18,12 +18,13 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   fullScreen = false,
 }) => {
   const content = (
-    <div className="text-center">
+    <div className="text-center" role="status" aria-live="polite">
       <svg
         className={`animate-spin ${sizeClasses[size]} text-blue-600 mx-auto mb-4`}
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
         viewBox="0 0 24 24"
+        aria-hidden="true"
       >
         <circle
           className="opacity-25"
