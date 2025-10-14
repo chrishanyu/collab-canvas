@@ -1,6 +1,6 @@
+import React, { useState } from 'react';
 import { Rect } from 'react-konva';
 import type { CanvasObject } from '../../types';
-import { useState } from 'react';
 import Konva from 'konva';
 
 interface ShapeProps {
@@ -10,7 +10,17 @@ interface ShapeProps {
   onDragEnd: (id: string, x: number, y: number) => void;
 }
 
-export const Shape = ({ shape, isSelected, onSelect, onDragEnd }: ShapeProps) => {
+/**
+ * Shape Component (Memoized for Performance)
+ * 
+ * Only re-renders when:
+ * - Shape position/size/color changes
+ * - Selection state changes
+ * 
+ * This prevents unnecessary re-renders when other shapes change,
+ * dramatically improving performance with many shapes (500+)
+ */
+export const Shape = React.memo(({ shape, isSelected, onSelect, onDragEnd }: ShapeProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -62,5 +72,23 @@ export const Shape = ({ shape, isSelected, onSelect, onDragEnd }: ShapeProps) =>
 
   // Placeholder for other shape types (circle, text) - to be implemented later
   return null;
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison function for React.memo
+  // Returns true if props are equal (skip re-render)
+  // Returns false if props changed (re-render)
+  
+  const shapeEqual = 
+    prevProps.shape.id === nextProps.shape.id &&
+    prevProps.shape.x === nextProps.shape.x &&
+    prevProps.shape.y === nextProps.shape.y &&
+    prevProps.shape.width === nextProps.shape.width &&
+    prevProps.shape.height === nextProps.shape.height &&
+    prevProps.shape.fill === nextProps.shape.fill &&
+    prevProps.shape.type === nextProps.shape.type;
+  
+  const selectionEqual = prevProps.isSelected === nextProps.isSelected;
+  
+  // Return true if nothing changed (prevents re-render)
+  return shapeEqual && selectionEqual;
+});
 
