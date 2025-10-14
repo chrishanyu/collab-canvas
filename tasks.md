@@ -598,15 +598,6 @@ collabcanvas/
 - [x] Canvas integration with Firebase complete
 - [x] Optimistic updates implemented
 - [x] Error handling with rollback on failures
-- [ ] **Manual Testing Required:**
-  - [ ] Creating a shape in one browser shows in all browsers viewing same canvas
-  - [ ] Moving a shape in one browser updates for all users on same canvas
-  - [ ] Changes in canvas A don't affect canvas B (isolation verified)
-  - [ ] Sync latency is under 100ms
-  - [ ] No duplicate shapes appear
-  - [ ] Canvas state persists per canvas (refresh and shapes remain)
-  - [ ] Works with 2+ simultaneous users viewing the same canvas
-  - [ ] Handles network disconnects gracefully
 
 ---
 
