@@ -318,6 +318,8 @@ export const Canvas: React.FC = () => {
   // Calculate actual stage height (used in multiple places)
   const actualStageHeight = stageHeight - HEADER_HEIGHT;
 
+  console.log(stageScale, stageX, stageY);
+
   // Generate grid dots for background (optimized for viewport)
   // Memoized to prevent unnecessary re-renders
   const gridDots = useMemo(() => {
@@ -345,10 +347,10 @@ export const Canvas: React.FC = () => {
     // Add padding for smooth scrolling
     const padding = dotSpacing * 5;
 
-    const visibleStartX = Math.max(0, Math.floor((viewportX - padding) / dotSpacing) * dotSpacing);
-    const visibleEndX = Math.min(CANVAS_WIDTH, Math.ceil((viewportX + viewportWidth + padding) / dotSpacing) * dotSpacing);
-    const visibleStartY = Math.max(0, Math.floor((viewportY - padding) / dotSpacing) * dotSpacing);
-    const visibleEndY = Math.min(CANVAS_HEIGHT, Math.ceil((viewportY + viewportHeight + padding) / dotSpacing) * dotSpacing);
+    const visibleStartX = Math.floor((viewportX - padding) / dotSpacing) * dotSpacing;
+    const visibleEndX = Math.ceil((viewportX + viewportWidth + padding) / dotSpacing) * dotSpacing;
+    const visibleStartY = Math.floor((viewportY - padding) / dotSpacing) * dotSpacing;
+    const visibleEndY = Math.ceil((viewportY + viewportHeight + padding) / dotSpacing) * dotSpacing;
 
     // Safety check: if range is invalid, return empty
     const xRange = visibleEndX - visibleStartX;
