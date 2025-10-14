@@ -72,11 +72,11 @@ collab-canvas/
    - Copy the Firebase configuration
 
 4. **Configure environment variables**
-   - Copy `.env.example` to `.env.local`
+   - Create a `.env` file in the root directory
      ```bash
-     cp .env.example .env.local
+     touch .env
      ```
-   - Fill in your Firebase configuration values in `.env.local`:
+   - Fill in your Firebase configuration values in `.env`:
      ```
      VITE_FIREBASE_API_KEY=your_api_key
      VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
@@ -85,6 +85,7 @@ collab-canvas/
      VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
      VITE_FIREBASE_APP_ID=your_app_id
      ```
+   - **Note:** The `.env` file is gitignored to keep your credentials secure
 
 5. **Start the development server**
    ```bash
