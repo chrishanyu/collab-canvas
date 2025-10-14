@@ -318,8 +318,6 @@ export const Canvas: React.FC = () => {
   // Calculate actual stage height (used in multiple places)
   const actualStageHeight = stageHeight - HEADER_HEIGHT;
 
-  console.log(stageScale, stageX, stageY);
-
   // Generate grid dots for background (optimized for viewport)
   // Memoized to prevent unnecessary re-renders
   const gridDots = useMemo(() => {
