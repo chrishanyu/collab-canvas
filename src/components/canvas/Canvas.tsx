@@ -66,8 +66,6 @@ export const Canvas: React.FC = () => {
   
   // Shape creation state
   const [isCreatingShape, setIsCreatingShape] = useState(false);
-  const [newShapeStart, setNewShapeStart] = useState<{ x: number; y: number } | null>(null);
-  const [newShapePreview, setNewShapePreview] = useState<CanvasObject | null>(null);
 
   // Presence state
   const updateCursorRef = useRef<((x: number, y: number) => void) | null>(null);
@@ -191,29 +189,19 @@ export const Canvas: React.FC = () => {
     setSelectedShapeId(null); // Deselect any selected shape
   };
 
-  const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    // Only handle shape creation if in creation mode
+  const handleStageMouseDown = async (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Click on empty space deselects shapes (if not in creation mode)
+    const clickedOnEmpty = e.target === e.target.getStage();
+    
     if (!isCreatingShape) {
-      // Click on empty space deselects shapes
-      const clickedOnEmpty = e.target === e.target.getStage();
       if (clickedOnEmpty) {
         setSelectedShapeId(null);
       }
       return;
     }
 
-    // Start creating shape
-    const stage = stageRef.current;
-    if (!stage) return;
-
-    const pos = getRelativePointerPosition(stage);
-    if (!pos) return;
-
-    setNewShapeStart(pos);
-  };
-
-  const handleStageMouseMove = () => {
-    if (!isCreatingShape || !newShapeStart) return;
+    // In creation mode: Create shape at click position
+    if (!canvasId || !currentUser) return;
 
     const stage = stageRef.current;
     if (!stage) return;
@@ -221,66 +209,42 @@ export const Canvas: React.FC = () => {
     const pos = getRelativePointerPosition(stage);
     if (!pos) return;
 
-    // Calculate rectangle dimensions
-    const width = pos.x - newShapeStart.x;
-    const height = pos.y - newShapeStart.y;
+    // Exit creation mode immediately to prevent rapid clicking
+    setIsCreatingShape(false);
 
-    // Create preview shape
-    const preview: CanvasObject = {
-      id: 'preview',
-      type: 'rectangle',
-      x: width >= 0 ? newShapeStart.x : pos.x,
-      y: height >= 0 ? newShapeStart.y : pos.y,
-      width: Math.abs(width),
-      height: Math.abs(height),
+    // Default shape size
+    const DEFAULT_SHAPE_WIDTH = 100;
+    const DEFAULT_SHAPE_HEIGHT = 100;
+
+    // Create shape centered at click position
+    const shapeData = {
+      type: 'rectangle' as const,
+      x: pos.x - DEFAULT_SHAPE_WIDTH / 2,
+      y: pos.y - DEFAULT_SHAPE_HEIGHT / 2,
+      width: DEFAULT_SHAPE_WIDTH,
+      height: DEFAULT_SHAPE_HEIGHT,
       fill: '#3B82F6', // blue-500
-      createdBy: currentUser?.id || '',
+      createdBy: currentUser.id,
+    };
+
+    // Optimistic update: Add to local state immediately
+    const optimisticShape: CanvasObject = {
+      ...shapeData,
+      id: generateUniqueId(),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+    setShapes([...shapes, optimisticShape]);
 
-    setNewShapePreview(preview);
-  };
-
-  const handleStageMouseUp = async () => {
-    if (!isCreatingShape || !newShapePreview || !canvasId || !currentUser) return;
-
-    // Only create shape if it has meaningful size (at least 5x5 pixels)
-    if (newShapePreview.width >= 5 && newShapePreview.height >= 5) {
-      const shapeData = {
-        type: newShapePreview.type,
-        x: newShapePreview.x,
-        y: newShapePreview.y,
-        width: newShapePreview.width,
-        height: newShapePreview.height,
-        fill: newShapePreview.fill,
-        createdBy: currentUser.id,
-      };
-
-      // Optimistic update: Add to local state immediately
-      const optimisticShape: CanvasObject = {
-        ...shapeData,
-        id: generateUniqueId(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      setShapes([...shapes, optimisticShape]);
-
-      // Write to Firebase (async, fire and forget)
-      try {
-        await createShapeInFirebase(canvasId, shapeData);
-        // Firestore listener will update with the actual shape from server
-      } catch (error) {
-        console.error('Failed to create shape in Firebase:', error);
-        // Revert optimistic update on error
-        setShapes(shapes); // Remove the optimistic shape
-      }
+    // Write to Firebase in background
+    try {
+      await createShapeInFirebase(canvasId, shapeData);
+      // Firestore listener will update with the actual shape from server
+    } catch (error) {
+      console.error('Failed to create shape in Firebase:', error);
+      // Revert optimistic update on error
+      setShapes(shapes); // Remove the optimistic shape
     }
-
-    // Reset creation state
-    setIsCreatingShape(false);
-    setNewShapeStart(null);
-    setNewShapePreview(null);
   };
 
   // Shape interaction handlers
@@ -409,7 +373,6 @@ export const Canvas: React.FC = () => {
     <div 
       className="relative w-full h-screen overflow-hidden bg-gray-200"
       onMouseMove={handleMouseMove}
-      style={{ cursor: 'none' }}
     >
       {/* Canvas Header */}
       <div className="absolute top-0 left-0 right-0 z-10 bg-white shadow-sm px-4 py-3 flex items-center justify-between">
@@ -443,7 +406,10 @@ export const Canvas: React.FC = () => {
       />
 
       {/* Konva Stage */}
-      <div className="pt-[60px] w-full h-full bg-gray-100">
+      <div 
+        className="pt-[60px] w-full h-full bg-gray-100"
+        style={{ cursor: isCreatingShape ? 'crosshair' : 'default' }}
+      >
         <Stage
           ref={stageRef}
           width={stageWidth}
@@ -456,8 +422,6 @@ export const Canvas: React.FC = () => {
           onDragEnd={handleDragEnd}
           onWheel={handleWheel}
           onMouseDown={handleStageMouseDown}
-          onMouseMove={handleStageMouseMove}
-          onMouseUp={handleStageMouseUp}
         >
           {/* Background Grid Layer - scales with zoom */}
           <Layer listening={false}>
@@ -484,17 +448,6 @@ export const Canvas: React.FC = () => {
                 onDragEnd={handleShapeDragEnd}
               />
             ))}
-            
-            {/* Render preview shape while creating */}
-            {newShapePreview && (
-              <Shape
-                key="preview"
-                shape={newShapePreview}
-                isSelected={false}
-                onSelect={() => {}}
-                onDragEnd={() => {}}
-              />
-            )}
           </Layer>
         </Stage>
       </div>

@@ -12,7 +12,7 @@ interface CanvasToolbarProps {
 /**
  * CanvasToolbar Component
  * Provides toolbar controls for canvas:
- * - Shape creation (Add Rectangle)
+ * - Shape creation (Add Rectangle - click to place)
  * - Reset view to default position and zoom
  * - Zoom in/out buttons
  */
@@ -34,9 +34,9 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
             ? 'bg-blue-500 text-white border-blue-600 hover:bg-blue-600'
             : 'bg-white hover:bg-gray-100 text-gray-700 border-gray-300'
         }`}
-        title="Add Rectangle - Click and drag to create"
+        title="Add Rectangle - Click on canvas to place"
       >
-        {isCreatingShape ? '✏️ Drawing...' : '⬛ Rectangle'}
+        {isCreatingShape ? '📍 Click to place' : '⬛ Rectangle'}
       </button>
       
       <div className="border-t border-gray-200 my-1"></div>
