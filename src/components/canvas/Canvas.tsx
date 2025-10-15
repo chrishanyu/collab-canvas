@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { Stage, Layer, Circle } from 'react-konva';
+import { Stage, Layer } from 'react-konva';
 import Konva from 'konva';
 import { useAuth } from '../../hooks/useAuth';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
@@ -10,6 +10,7 @@ import { LoadingSpinner } from '../common/LoadingSpinner';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { CanvasToolbar } from './CanvasToolbar';
 import { Shape } from './Shape';
+import { GridDots } from './GridDots';
 import { UserPresence } from '../presence/UserPresence';
 import { constrainZoom, getRelativePointerPosition, generateUniqueId } from '../../utils/canvasHelpers';
 import type { Canvas as CanvasType, CanvasObject } from '../../types';
@@ -24,7 +25,6 @@ import {
 
 // Canvas UI constants
 const HEADER_HEIGHT = 60;
-const MAX_GRID_DOTS = 10000; // Safety limit to prevent performance issues
 
 /**
  * Canvas Component (Performance Optimized)
@@ -35,8 +35,8 @@ const MAX_GRID_DOTS = 10000; // Safety limit to prevent performance issues
  * Performance Optimizations:
  * - Viewport virtualization: Only renders shapes visible in current viewport (critical for 500+ shapes)
  * - Shape memoization: Prevents unnecessary re-renders with React.memo
- * - Memoized grid dots: Grid only recalculates when viewport changes
- * - Viewport culling: Only visible grid dots are rendered
+ * - Optimized grid dots: Single canvas draw call instead of thousands of React components (60 FPS)
+ * - Grid fading: Grid fades in/out based on zoom level (Figma-like behavior)
  * - Optimistic updates: Shape changes appear instantly, sync in background
  * - Stable realtime sync: Prevents unnecessary Firebase re-subscriptions
  * 
@@ -66,8 +66,6 @@ export const Canvas: React.FC = () => {
   
   // Shape creation state
   const [isCreatingShape, setIsCreatingShape] = useState(false);
-  const [newShapeStart, setNewShapeStart] = useState<{ x: number; y: number } | null>(null);
-  const [newShapePreview, setNewShapePreview] = useState<CanvasObject | null>(null);
 
   // Presence state
   const updateCursorRef = useRef<((x: number, y: number) => void) | null>(null);
@@ -191,29 +189,19 @@ export const Canvas: React.FC = () => {
     setSelectedShapeId(null); // Deselect any selected shape
   };
 
-  const handleStageMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    // Only handle shape creation if in creation mode
+  const handleStageMouseDown = async (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Click on empty space deselects shapes (if not in creation mode)
+    const clickedOnEmpty = e.target === e.target.getStage();
+    
     if (!isCreatingShape) {
-      // Click on empty space deselects shapes
-      const clickedOnEmpty = e.target === e.target.getStage();
       if (clickedOnEmpty) {
         setSelectedShapeId(null);
       }
       return;
     }
 
-    // Start creating shape
-    const stage = stageRef.current;
-    if (!stage) return;
-
-    const pos = getRelativePointerPosition(stage);
-    if (!pos) return;
-
-    setNewShapeStart(pos);
-  };
-
-  const handleStageMouseMove = () => {
-    if (!isCreatingShape || !newShapeStart) return;
+    // In creation mode: Create shape at click position
+    if (!canvasId || !currentUser) return;
 
     const stage = stageRef.current;
     if (!stage) return;
@@ -221,66 +209,42 @@ export const Canvas: React.FC = () => {
     const pos = getRelativePointerPosition(stage);
     if (!pos) return;
 
-    // Calculate rectangle dimensions
-    const width = pos.x - newShapeStart.x;
-    const height = pos.y - newShapeStart.y;
+    // Exit creation mode immediately to prevent rapid clicking
+    setIsCreatingShape(false);
 
-    // Create preview shape
-    const preview: CanvasObject = {
-      id: 'preview',
-      type: 'rectangle',
-      x: width >= 0 ? newShapeStart.x : pos.x,
-      y: height >= 0 ? newShapeStart.y : pos.y,
-      width: Math.abs(width),
-      height: Math.abs(height),
+    // Default shape size
+    const DEFAULT_SHAPE_WIDTH = 100;
+    const DEFAULT_SHAPE_HEIGHT = 100;
+
+    // Create shape centered at click position
+    const shapeData = {
+      type: 'rectangle' as const,
+      x: pos.x - DEFAULT_SHAPE_WIDTH / 2,
+      y: pos.y - DEFAULT_SHAPE_HEIGHT / 2,
+      width: DEFAULT_SHAPE_WIDTH,
+      height: DEFAULT_SHAPE_HEIGHT,
       fill: '#3B82F6', // blue-500
-      createdBy: currentUser?.id || '',
+      createdBy: currentUser.id,
+    };
+
+    // Optimistic update: Add to local state immediately
+    const optimisticShape: CanvasObject = {
+      ...shapeData,
+      id: generateUniqueId(),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+    setShapes([...shapes, optimisticShape]);
 
-    setNewShapePreview(preview);
-  };
-
-  const handleStageMouseUp = async () => {
-    if (!isCreatingShape || !newShapePreview || !canvasId || !currentUser) return;
-
-    // Only create shape if it has meaningful size (at least 5x5 pixels)
-    if (newShapePreview.width >= 5 && newShapePreview.height >= 5) {
-      const shapeData = {
-        type: newShapePreview.type,
-        x: newShapePreview.x,
-        y: newShapePreview.y,
-        width: newShapePreview.width,
-        height: newShapePreview.height,
-        fill: newShapePreview.fill,
-        createdBy: currentUser.id,
-      };
-
-      // Optimistic update: Add to local state immediately
-      const optimisticShape: CanvasObject = {
-        ...shapeData,
-        id: generateUniqueId(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      setShapes([...shapes, optimisticShape]);
-
-      // Write to Firebase (async, fire and forget)
-      try {
-        await createShapeInFirebase(canvasId, shapeData);
-        // Firestore listener will update with the actual shape from server
-      } catch (error) {
-        console.error('Failed to create shape in Firebase:', error);
-        // Revert optimistic update on error
-        setShapes(shapes); // Remove the optimistic shape
-      }
+    // Write to Firebase in background
+    try {
+      await createShapeInFirebase(canvasId, shapeData);
+      // Firestore listener will update with the actual shape from server
+    } catch (error) {
+      console.error('Failed to create shape in Firebase:', error);
+      // Revert optimistic update on error
+      setShapes(shapes); // Remove the optimistic shape
     }
-
-    // Reset creation state
-    setIsCreatingShape(false);
-    setNewShapeStart(null);
-    setNewShapePreview(null);
   };
 
   // Shape interaction handlers
@@ -328,71 +292,6 @@ export const Canvas: React.FC = () => {
 
   // Calculate actual stage height (used in multiple places)
   const actualStageHeight = stageHeight - HEADER_HEIGHT;
-
-  // Generate grid dots for background (optimized for viewport)
-  // Memoized to prevent unnecessary re-renders
-  const gridDots = useMemo(() => {
-    const dots: React.ReactElement[] = [];
-    const dotSpacing = 20; // 20px spacing between dots
-    const dotRadius = 1; // 1px dot radius
-    const dotColor = '#d1d5db'; // gray-300
-
-    // Prevent errors when stageScale, stageX, or stageY are invalid
-    if (
-      stageScale <= 0 || 
-      !isFinite(stageScale) || 
-      !isFinite(stageX) || 
-      !isFinite(stageY)
-    ) {
-      return dots;
-    }
-
-    // Calculate visible area based on current pan and zoom with safety checks
-    const viewportWidth = stageWidth / stageScale;
-    const viewportHeight = actualStageHeight / stageScale;
-    const viewportX = -stageX / stageScale;
-    const viewportY = -stageY / stageScale;
-
-    // Add padding for smooth scrolling
-    const padding = dotSpacing * 5;
-
-    const visibleStartX = Math.floor((viewportX - padding) / dotSpacing) * dotSpacing;
-    const visibleEndX = Math.ceil((viewportX + viewportWidth + padding) / dotSpacing) * dotSpacing;
-    const visibleStartY = Math.floor((viewportY - padding) / dotSpacing) * dotSpacing;
-    const visibleEndY = Math.ceil((viewportY + viewportHeight + padding) / dotSpacing) * dotSpacing;
-
-    // Safety check: if range is invalid, return empty
-    const xRange = visibleEndX - visibleStartX;
-    const yRange = visibleEndY - visibleStartY;
-    if (xRange < 0 || yRange < 0 || !isFinite(xRange) || !isFinite(yRange)) {
-      return dots;
-    }
-
-    // Safety check: prevent rendering too many dots
-    const estimatedDots = (xRange / dotSpacing) * (yRange / dotSpacing);
-    if (estimatedDots > MAX_GRID_DOTS) {
-      return dots;
-    }
-
-    // Render all visible dots
-    for (let x = visibleStartX; x <= visibleEndX; x += dotSpacing) {
-      for (let y = visibleStartY; y <= visibleEndY; y += dotSpacing) {
-        dots.push(
-          <Circle
-            key={`dot-${x}-${y}`}
-            x={x}
-            y={y}
-            radius={dotRadius}
-            fill={dotColor}
-            listening={false}
-            perfectDrawEnabled={false}
-          />
-        );
-      }
-    }
-
-    return dots;
-  }, [stageScale, stageX, stageY, stageWidth, actualStageHeight]);
 
   // Viewport virtualization: Only render shapes visible in current viewport
   // This is critical for performance with 500+ shapes
@@ -446,7 +345,7 @@ export const Canvas: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-gray-100">
         <LoadingSpinner />
       </div>
     );
@@ -454,7 +353,7 @@ export const Canvas: React.FC = () => {
 
   if (error || !canvas) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
         <div className="max-w-md">
           <ErrorAlert message={error || 'Canvas not found'} />
           <div className="mt-4 text-center">
@@ -472,9 +371,8 @@ export const Canvas: React.FC = () => {
 
   return (
     <div 
-      className="relative w-full h-screen overflow-hidden bg-gray-100"
+      className="relative w-full h-screen overflow-hidden bg-gray-200"
       onMouseMove={handleMouseMove}
-      style={{ cursor: 'none' }}
     >
       {/* Canvas Header */}
       <div className="absolute top-0 left-0 right-0 z-10 bg-white shadow-sm px-4 py-3 flex items-center justify-between">
@@ -508,7 +406,10 @@ export const Canvas: React.FC = () => {
       />
 
       {/* Konva Stage */}
-      <div className="pt-[60px] w-full h-full bg-gray-50">
+      <div 
+        className="pt-[60px] w-full h-full bg-gray-100"
+        style={{ cursor: isCreatingShape ? 'crosshair' : 'default' }}
+      >
         <Stage
           ref={stageRef}
           width={stageWidth}
@@ -521,12 +422,18 @@ export const Canvas: React.FC = () => {
           onDragEnd={handleDragEnd}
           onWheel={handleWheel}
           onMouseDown={handleStageMouseDown}
-          onMouseMove={handleStageMouseMove}
-          onMouseUp={handleStageMouseUp}
         >
           {/* Background Grid Layer - scales with zoom */}
           <Layer listening={false}>
-            {gridDots}
+            <GridDots
+              width={stageWidth}
+              height={actualStageHeight}
+              stageScale={stageScale}
+              stageX={stageX}
+              stageY={stageY}
+              canvasWidth={CANVAS_WIDTH}
+              canvasHeight={CANVAS_HEIGHT}
+            />
           </Layer>
           
           {/* Main Content Layer */}
@@ -541,17 +448,6 @@ export const Canvas: React.FC = () => {
                 onDragEnd={handleShapeDragEnd}
               />
             ))}
-            
-            {/* Render preview shape while creating */}
-            {newShapePreview && (
-              <Shape
-                key="preview"
-                shape={newShapePreview}
-                isSelected={false}
-                onSelect={() => {}}
-                onDragEnd={() => {}}
-              />
-            )}
           </Layer>
         </Stage>
       </div>

@@ -45,14 +45,12 @@ export const UserPresence: React.FC<UserPresenceProps> = ({
 
   return (
     <>
-      {/* Render all users' cursors as overlays (including current user) */}
-      {onlineUsers.map((user) => {
-        // Generate color client-side: current user = black, others = deterministic color
-        const color = user.userId === userId 
-          ? '#000000' 
-          : getUserCursorColor(user.userId, '__NOT_CURRENT__');
-        
-        const isCurrentUser = user.userId === userId;
+      {/* Render only other users' cursors as overlays (exclude current user) */}
+      {onlineUsers
+        .filter((user) => user.userId !== userId)
+        .map((user) => {
+        // Generate color client-side for other users
+        const color = getUserCursorColor(user.userId, '__NOT_CURRENT__');
         
         // Convert canvas coordinates to viewport coordinates
         // This ensures cursors appear correctly regardless of each user's zoom/pan
@@ -66,7 +64,7 @@ export const UserPresence: React.FC<UserPresenceProps> = ({
             y={viewportY}
             name={user.displayName}
             color={color}
-            showName={!isCurrentUser}
+            showName={true}
           />
         );
       })}

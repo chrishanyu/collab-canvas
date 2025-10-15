@@ -405,7 +405,7 @@ describe('Canvas Toolbar Tests', () => {
     expect(mockHandlers.onAddRectangle).toHaveBeenCalledTimes(1);
   });
 
-  it('should show "Drawing..." when in creation mode', () => {
+  it('should show "Click to place" when in creation mode', () => {
     const mockHandlers = {
       onResetView: vi.fn(),
       onZoomIn: vi.fn(),
@@ -421,7 +421,7 @@ describe('Canvas Toolbar Tests', () => {
       />
     );
 
-    expect(screen.getByText(/Drawing.../i)).toBeInTheDocument();
+    expect(screen.getByText(/Click to place/i)).toBeInTheDocument();
   });
 
   it('should call zoom handlers when zoom buttons are clicked', async () => {
