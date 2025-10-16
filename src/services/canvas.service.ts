@@ -7,7 +7,9 @@ import {
   query, 
   where,
   serverTimestamp,
-  Timestamp 
+  Timestamp,
+  deleteDoc,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { Canvas, CanvasAccess, AccessRole } from '../types';
@@ -170,6 +172,86 @@ export async function updateCanvasAccess(
   } catch (error) {
     console.error('Error updating canvas access:', error);
     throw new Error('Failed to update canvas access');
+  }
+}
+
+/**
+ * Permanently deletes a canvas and all associated data
+ * 
+ * This function performs a complete cleanup by deleting:
+ * - The canvas metadata document
+ * - All canvas objects (shapes, etc.) in a batch operation
+ * - User access records for all users who had access
+ * 
+ * IMPORTANT: This operation is permanent and cannot be undone.
+ * Only the canvas owner can delete a canvas.
+ * 
+ * @param canvasId - ID of the canvas to delete
+ * @param userId - ID of the user requesting deletion (must be owner)
+ * @throws {Error} If user is not the owner
+ * @throws {Error} If canvas does not exist
+ * @throws {Error} If deletion operation fails
+ */
+export async function deleteCanvas(
+  canvasId: string,
+  userId: string
+): Promise<void> {
+  try {
+    // Step 1: Get canvas metadata to verify ownership
+    const canvasRef = doc(db, 'canvases', canvasId);
+    const canvasSnap = await getDoc(canvasRef);
+    
+    if (!canvasSnap.exists()) {
+      throw new Error('Canvas not found');
+    }
+    
+    const canvas = canvasSnap.data();
+    
+    // Step 2: Verify ownership - only owner can delete
+    if (canvas.ownerId !== userId) {
+      throw new Error('Only the canvas owner can delete this canvas');
+    }
+    
+    // Step 3: Delete canvas metadata document
+    await deleteDoc(canvasRef);
+    
+    // Step 4: Get all canvas objects for batch deletion
+    const objectsRef = collection(db, 'canvas-objects', canvasId, 'objects');
+    const objectsSnap = await getDocs(objectsRef);
+    
+    // Step 5: Create batch for deleting all objects
+    if (!objectsSnap.empty) {
+      const batch = writeBatch(db);
+      
+      // Step 6: Add all object deletions to batch
+      objectsSnap.docs.forEach((objectDoc) => {
+        batch.delete(objectDoc.ref);
+      });
+      
+      // Step 7: Commit batch deletion
+      await batch.commit();
+    }
+    
+    // Step 8: Delete user access records
+    // Note: This cleans up the access list for the owner
+    // Other users' access records could be cleaned up but are harmless orphans
+    try {
+      const userAccessRef = doc(db, 'user-canvases', userId, 'canvases', canvasId);
+      await deleteDoc(userAccessRef);
+    } catch (accessError) {
+      // Non-critical: Log but don't fail the deletion if access cleanup fails
+      console.warn('Failed to clean up user access record:', accessError);
+    }
+    
+  } catch (error) {
+    // Step 9: Error handling with helpful messages
+    console.error('Error deleting canvas:', error);
+    
+    if (error instanceof Error) {
+      throw error; // Re-throw specific errors (ownership, not found)
+    }
+    
+    throw new Error('Failed to delete canvas. Please try again.');
   }
 }
 

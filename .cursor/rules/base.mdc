@@ -1,0 +1,320 @@
+---
+Description: Core project rules and patterns for CollabCanvas MVP
+---
+
+# CollabCanvas Project Rules
+
+## Project Context
+
+This is a **real-time collaborative canvas application** (Figma-like) built with React, TypeScript, Firebase, and Konva.js. The project follows a **multi-canvas architecture** where users can create unlimited isolated workspaces.
+
+**Current Status:** 7/11 PRs complete (64%), 113/113 tests passing
+**Current Branch:** feature/ui-polish
+**Next PRs:** Deployment (#8), Performance Optimization (#9)
+
+## Critical Patterns to Follow
+
+### 1. Multi-Canvas Isolation (CRITICAL)
+Every feature must respect canvas isolation. When working with Firebase:
+- Always scope operations by `canvasId` parameter
+- Never query across canvases accidentally
+- Use nested Firestore structure: `/canvas-objects/{canvasId}/objects/{objectId}`
+- Same for presence: `/presence/{canvasId}/users/{userId}`
+
+**Bad:**
+```typescript
+// Don't do this - queries all canvases
+const objects = await getDocs(collection(db, 'objects'));
+```
+
+**Good:**
+```typescript
+// Do this - scoped to specific canvas
+const objects = await getDocs(
+  collection(db, 'canvas-objects', canvasId, 'objects')
+);
+```
+
+### 2. Optimistic UI Updates
+Always update local state immediately for responsiveness, then sync to Firebase:
+
+**Pattern:**
+```typescript
+// 1. Update local state immediately
+setShapes(prev => [...prev, newShape]);
+
+// 2. Write to Firebase in background
+try {
+  await canvasObjects.createShape(canvasId, newShape);
+} catch (error) {
+  // 3. Rollback on error
+  setShapes(prev => prev.filter(s => s.id !== newShape.id));
+  console.error('Failed to create shape:', error);
+}
+```
+
+### 3. Real-Time Subscription Cleanup
+Always unsubscribe from Firebase listeners to prevent memory leaks:
+
+**Pattern:**
+```typescript
+useEffect(() => {
+  const unsubscribe = canvasObjects.subscribeToCanvasObjects(
+    canvasId,
+    (objects) => setShapes(objects)
+  );
+  
+  // Cleanup on unmount or canvasId change
+  return () => unsubscribe();
+}, [canvasId]);
+```
+
+### 4. Performance-First Rendering
+Maintain 60 FPS at all costs:
+- Use `React.memo()` for presentational components
+- Use `useMemo()` and `useCallback()` for stable references
+- Avoid re-rendering Konva layers unnecessarily
+- Use viewport culling for off-screen objects
+- Single draw call for repeated patterns (grid)
+
+**Example (Grid Optimization):**
+```typescript
+// Single Shape with custom sceneFunc instead of 5000+ Circle components
+<Shape
+  sceneFunc={(context, shape) => {
+    visibleDots.forEach(dot => {
+      context.beginPath();
+      context.arc(dot.x, dot.y, 1, 0, 2 * Math.PI);
+      context.fill();
+    });
+  }}
+  listening={false}
+  perfectDrawEnabled={false}
+/>
+```
+
+### 5. TypeScript Strictness
+All code must be fully typed:
+- No `any` types (use `unknown` if truly needed)
+- Define interfaces for all props and data structures
+- Use TypeScript for all service functions
+- Leverage type inference where possible
+
+### 6. Testing Requirements
+- Unit tests for all services and utilities (80%+ coverage)
+- Integration tests for critical user flows
+- Mock Firebase for all tests (no real database calls)
+- Test isolation, not implementation details
+
+**Test naming pattern:**
+```typescript
+describe('canvasObjects.service', () => {
+  it('creates shape in correct canvas', async () => { ... });
+  it('throws error if canvas not found', async () => { ... });
+});
+```
+
+## File Organization Patterns
+
+### Component Structure
+```typescript
+// components/[feature]/[ComponentName].tsx
+src/
+├── components/
+│   ├── auth/           // Authentication UI
+│   ├── canvas/         // Canvas and shapes
+│   ├── dashboard/      // Project management
+│   ├── presence/       // Multiplayer features
+│   ├── layout/         // App shell
+│   └── common/         // Reusable components
+```
+
+### Service Layer Pattern
+All Firebase operations go through service files:
+```typescript
+// services/[resource].service.ts
+export const canvasObjects = {
+  async createShape(canvasId: string, shape: CanvasObject) { ... },
+  async updateShape(canvasId: string, shapeId: string, updates: Partial<CanvasObject>) { ... },
+  subscribeToCanvasObjects(canvasId: string, callback: (objects: CanvasObject[]) => void) { ... }
+};
+```
+
+### Custom Hooks Pattern
+Encapsulate complex logic in hooks:
+```typescript
+// hooks/use[Feature].ts
+export function useRealtimeSync(canvasId: string) {
+  const [shapes, setShapes] = useState<CanvasObject[]>([]);
+  
+  useEffect(() => {
+    const unsubscribe = canvasObjects.subscribeToCanvasObjects(
+      canvasId,
+      setShapes
+    );
+    return unsubscribe;
+  }, [canvasId]);
+  
+  return shapes;
+}
+```
+
+## Naming Conventions
+
+- **Components:** PascalCase (`Canvas.tsx`, `Shape.tsx`)
+- **Hooks:** camelCase with `use` prefix (`useAuth.ts`, `usePresence.ts`)
+- **Services:** camelCase with `.service.ts` suffix (`auth.service.ts`)
+- **Utils:** camelCase (`canvasHelpers.ts`, `constants.ts`)
+- **Types:** PascalCase (`User`, `CanvasObject`, `UserPresence`)
+- **Tests:** Match source file with `.test.ts(x)` suffix
+
+## Firebase Best Practices
+
+### Always Use Server Timestamps
+```typescript
+import { serverTimestamp } from 'firebase/firestore';
+
+await setDoc(docRef, {
+  ...data,
+  createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp()
+});
+```
+
+### Batch Related Operations
+```typescript
+const batch = writeBatch(db);
+batch.set(canvasRef, canvasData);
+batch.set(accessRef, accessData);
+await batch.commit();
+```
+
+### Handle Offline State
+Firebase provides automatic offline support, but be aware:
+- Optimistic updates work offline
+- Writes queued automatically
+- Show connection state if needed
+
+## Performance Targets (Non-Negotiable)
+
+- **60 FPS** during pan/zoom/drag
+- **Sub-100ms** object sync latency
+- **Sub-50ms** cursor sync latency
+- **500+ shapes** without FPS drops
+- **5+ concurrent users** per canvas
+
+## Common Pitfalls to Avoid
+
+### ❌ Don't: Subscribe without cleanup
+```typescript
+useEffect(() => {
+  subscribeToPresence(canvasId, callback);
+  // Missing cleanup!
+}, [canvasId]);
+```
+
+### ✅ Do: Always cleanup subscriptions
+```typescript
+useEffect(() => {
+  const unsubscribe = subscribeToPresence(canvasId, callback);
+  return () => unsubscribe();
+}, [canvasId]);
+```
+
+### ❌ Don't: Forget canvas isolation
+```typescript
+// This affects ALL canvases!
+const ref = collection(db, 'objects');
+```
+
+### ✅ Do: Always scope by canvasId
+```typescript
+const ref = collection(db, 'canvas-objects', canvasId, 'objects');
+```
+
+### ❌ Don't: Block UI waiting for Firebase
+```typescript
+const handleClick = async () => {
+  await createShape(canvasId, shape);  // User waits
+  setShapes([...shapes, shape]);       // Then sees update
+};
+```
+
+### ✅ Do: Optimistic updates
+```typescript
+const handleClick = async () => {
+  setShapes([...shapes, shape]);       // User sees immediately
+  await createShape(canvasId, shape);  // Sync in background
+};
+```
+
+## Code Quality Standards
+
+### Linting
+- Run ESLint before committing
+- Fix all warnings
+- No console.log in production code (console.error for errors only)
+
+### Testing
+- Write tests before marking PR complete
+- All tests must pass before merge
+- Maintain 80%+ coverage for services/utils
+
+### Documentation
+- Update memory bank after significant changes
+- Comment complex algorithms
+- Document architectural decisions
+- Keep README up to date
+
+## Scope Boundaries (Out of MVP)
+
+Do NOT implement these unless explicitly requested:
+- ❌ Canvas deletion or archiving
+- ❌ Canvas renaming after creation
+- ❌ Permission levels (view-only vs edit)
+- ❌ Undo/redo functionality
+- ❌ Advanced transformations (rotation, skew)
+- ❌ AI agent integration (Phase 2)
+- ❌ Mobile optimization
+
+If user requests any of these, clarify that they're out of MVP scope.
+
+## Development Workflow
+
+1. **Read memory bank** before starting work
+2. **Check activeContext.md** for current state
+3. **Write tests first** for new features
+4. **Implement with types** (no `any`)
+5. **Optimize for 60 FPS** from the start
+6. **Test manually** with multiple browsers
+7. **Update memory bank** after completion
+
+## Emergency Debugging Checklist
+
+If something breaks:
+1. Check browser console for errors
+2. Verify Firebase rules (test mode during dev)
+3. Check `canvasId` is being passed correctly
+4. Verify subscriptions are cleaning up
+5. Check for missing dependencies in useEffect
+6. Verify optimistic updates are rolling back on error
+7. Check network tab for Firebase errors
+
+## Key Commands
+
+```bash
+npm run dev              # Start dev server
+npm run test            # Run all tests
+npm run test -- --watch # Watch mode
+npm run build           # Production build
+npm run preview         # Test production locally
+npm run lint            # Check code quality
+```
+
+## When in Doubt
+
+1. Check **memory-bank/systemPatterns.md** for architecture
+2. Check **memory-bank/techContext.md** for tech stack details
+3. Check **existing code** for similar patterns
+4. Prioritize **performance** and **canvas isolation**
+5. Always **test with multiple canvases** to verify isolation

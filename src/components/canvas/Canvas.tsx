@@ -101,6 +101,7 @@ export const Canvas: React.FC = () => {
 
   // Real-time sync: Subscribe to Firestore changes for this canvas
   const handleShapesUpdate = useCallback((syncedShapes: CanvasObject[]) => {
+    console.log('handleShapesUpdate', syncedShapes);
     setShapes(syncedShapes);
   }, []);
 

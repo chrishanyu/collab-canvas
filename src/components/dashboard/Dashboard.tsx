@@ -170,6 +170,7 @@ export const Dashboard: React.FC = () => {
                 key={canvas.id}
                 canvas={canvas}
                 onShare={handleShareCanvas}
+                onDelete={loadCanvases}
               />
             ))}
           </div>

@@ -1,14 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+import { deleteCanvas } from '../../services/canvas.service';
 import type { Canvas } from '../../types';
+import { DeleteCanvasModal } from './DeleteCanvasModal';
 
 interface CanvasCardProps {
   canvas: Canvas;
   onShare: (canvas: Canvas) => void;
+  onDelete: () => void; // Callback to refresh dashboard after deletion
 }
 
-export const CanvasCard: React.FC<CanvasCardProps> = ({ canvas, onShare }) => {
+export const CanvasCard: React.FC<CanvasCardProps> = ({ canvas, onShare, onDelete }) => {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Check if current user is the canvas owner
+  const isOwner = canvas.ownerId === currentUser?.id;
 
   const handleCardClick = () => {
     navigate(`/canvas/${canvas.id}`);
@@ -17,6 +27,29 @@ export const CanvasCard: React.FC<CanvasCardProps> = ({ canvas, onShare }) => {
   const handleShareClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent card click navigation
     onShare(canvas);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click navigation
+    setShowDeleteModal(true);
+  };
+
+  const handleDelete = async () => {
+    if (!currentUser) return;
+
+    try {
+      setIsDeleting(true);
+      await deleteCanvas(canvas.id, currentUser.id);
+      
+      // Success - close modal and refresh dashboard
+      setShowDeleteModal(false);
+      onDelete(); // Refresh dashboard
+    } catch (error) {
+      // Error handling - log error but don't show alert
+      console.error('Error deleting canvas:', error);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const formatDate = (date: Date): string => {
@@ -39,18 +72,43 @@ export const CanvasCard: React.FC<CanvasCardProps> = ({ canvas, onShare }) => {
   };
 
   return (
-    <div
-      onClick={handleCardClick}
-      className="group relative flex h-64 cursor-pointer flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-all hover:border-indigo-300 hover:shadow-md"
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          handleCardClick();
-        }
-      }}
-    >
-      {/* Canvas Thumbnail Placeholder */}
+    <>
+      <div
+        onClick={handleCardClick}
+        className="group relative flex h-64 cursor-pointer flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-all hover:border-indigo-300 hover:shadow-md"
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            handleCardClick();
+          }
+        }}
+      >
+        {/* Delete Button (Owner Only) */}
+        {isOwner && (
+          <button
+            onClick={handleDeleteClick}
+            className="absolute right-2 top-2 rounded-md p-2 text-gray-400 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+            aria-label={`Delete ${canvas.name}`}
+            title="Delete canvas"
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </button>
+        )}
+
+        {/* Canvas Thumbnail Placeholder */}
       <div className="mb-4 flex h-32 items-center justify-center rounded-md bg-gradient-to-br from-indigo-50 to-purple-50">
         {canvas.thumbnail ? (
           <img
@@ -110,7 +168,17 @@ export const CanvasCard: React.FC<CanvasCardProps> = ({ canvas, onShare }) => {
           </button>
         </div>
       </div>
-    </div>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteCanvasModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        canvasName={canvas.name}
+        onConfirm={handleDelete}
+        isDeleting={isDeleting}
+      />
+    </>
   );
 };
 
