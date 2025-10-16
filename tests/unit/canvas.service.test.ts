@@ -3,11 +3,14 @@ import {
   mockSetDoc,
   mockGetDoc,
   mockGetDocs,
+  mockDeleteDoc,
   mockDoc,
   mockCollection,
   mockQuery,
   mockWhere,
   mockTimestamp,
+  mockWriteBatch,
+  mockBatch,
   MockTimestamp,
   resetAllMocks,
 } from '../mocks/firebase.mock';
@@ -19,6 +22,7 @@ import {
   getUserCanvases,
   updateCanvasAccess,
   generateShareLink,
+  deleteCanvas,
 } from '../../src/services/canvas.service';
 
 describe('Canvas Service', () => {
@@ -600,6 +604,273 @@ describe('Canvas Service', () => {
       // Assert
       expect(result1).toBe('https://test-app.com/canvas/short-id');
       expect(result2).toBe('https://test-app.com/canvas/very-long-canvas-id-with-many-characters-123');
+    });
+  });
+
+  describe('deleteCanvas', () => {
+    it('should successfully delete canvas document', async () => {
+      // Arrange
+      const canvasId = 'canvas-abc123';
+      const userId = 'user-123';
+      
+      const mockCanvasData = {
+        name: 'Test Canvas',
+        ownerId: userId,
+        ownerName: 'John Doe',
+      };
+      
+      mockDoc.mockReturnValue({ id: canvasId });
+      mockGetDoc.mockResolvedValueOnce({
+        exists: () => true,
+        data: () => mockCanvasData,
+      });
+      mockGetDocs.mockResolvedValue({ empty: true, docs: [] });
+      mockDeleteDoc.mockResolvedValue(undefined);
+
+      // Act
+      await deleteCanvas(canvasId, userId);
+
+      // Assert
+      expect(mockDeleteDoc).toHaveBeenCalledWith({ id: canvasId });
+    });
+
+    it('should delete all canvas objects using batch', async () => {
+      // Arrange
+      const canvasId = 'canvas-abc123';
+      const userId = 'user-123';
+      
+      const mockCanvasData = {
+        name: 'Test Canvas',
+        ownerId: userId,
+      };
+      
+      const mockObject1 = { ref: { id: 'obj-1' } };
+      const mockObject2 = { ref: { id: 'obj-2' } };
+      const mockObject3 = { ref: { id: 'obj-3' } };
+      
+      mockDoc.mockReturnValue({ id: canvasId });
+      mockGetDoc.mockResolvedValueOnce({
+        exists: () => true,
+        data: () => mockCanvasData,
+      });
+      mockCollection.mockReturnValue({ path: 'canvas-objects' });
+      mockGetDocs.mockResolvedValueOnce({
+        empty: false,
+        docs: [mockObject1, mockObject2, mockObject3],
+      });
+      mockWriteBatch.mockReturnValue(mockBatch);
+      mockDeleteDoc.mockResolvedValue(undefined);
+
+      // Act
+      await deleteCanvas(canvasId, userId);
+
+      // Assert
+      expect(mockWriteBatch).toHaveBeenCalled();
+      expect(mockBatch.delete).toHaveBeenCalledTimes(3);
+      expect(mockBatch.delete).toHaveBeenCalledWith(mockObject1.ref);
+      expect(mockBatch.delete).toHaveBeenCalledWith(mockObject2.ref);
+      expect(mockBatch.delete).toHaveBeenCalledWith(mockObject3.ref);
+      expect(mockBatch.commit).toHaveBeenCalled();
+    });
+
+    it('should delete user access records', async () => {
+      // Arrange
+      const canvasId = 'canvas-abc123';
+      const userId = 'user-123';
+      
+      const mockCanvasData = {
+        name: 'Test Canvas',
+        ownerId: userId,
+      };
+      
+      mockDoc.mockReturnValue({ id: 'mock-doc' });
+      mockGetDoc.mockResolvedValueOnce({
+        exists: () => true,
+        data: () => mockCanvasData,
+      });
+      mockGetDocs.mockResolvedValue({ empty: true, docs: [] });
+      mockDeleteDoc.mockResolvedValue(undefined);
+
+      // Act
+      await deleteCanvas(canvasId, userId);
+
+      // Assert
+      // Should be called twice: once for canvas, once for user access
+      expect(mockDeleteDoc).toHaveBeenCalledTimes(2);
+    });
+
+    it('should throw error if user is not owner', async () => {
+      // Arrange
+      const canvasId = 'canvas-abc123';
+      const userId = 'user-123';
+      const differentUserId = 'user-456';
+      
+      const mockCanvasData = {
+        name: 'Test Canvas',
+        ownerId: differentUserId, // Different owner
+        ownerName: 'Jane Doe',
+      };
+      
+      mockDoc.mockReturnValue({ id: canvasId });
+      mockGetDoc.mockResolvedValueOnce({
+        exists: () => true,
+        data: () => mockCanvasData,
+      });
+
+      // Act & Assert
+      await expect(deleteCanvas(canvasId, userId)).rejects.toThrow(
+        'Only the canvas owner can delete this canvas'
+      );
+      expect(mockDeleteDoc).not.toHaveBeenCalled();
+    });
+
+    it('should throw error if canvas does not exist', async () => {
+      // Arrange
+      const canvasId = 'nonexistent-canvas';
+      const userId = 'user-123';
+      
+      mockDoc.mockReturnValue({ id: canvasId });
+      mockGetDoc.mockResolvedValueOnce({
+        exists: () => false,
+        data: () => null,
+      });
+
+      // Act & Assert
+      await expect(deleteCanvas(canvasId, userId)).rejects.toThrow(
+        'Canvas not found'
+      );
+      expect(mockDeleteDoc).not.toHaveBeenCalled();
+    });
+
+    it('should handle Firestore errors gracefully (network failure)', async () => {
+      // Arrange
+      const canvasId = 'canvas-abc123';
+      const userId = 'user-123';
+      
+      mockDoc.mockReturnValue({ id: canvasId });
+      mockGetDoc.mockRejectedValue(new Error('Network error'));
+
+      // Act & Assert
+      await expect(deleteCanvas(canvasId, userId)).rejects.toThrow();
+    });
+
+    it('should throw appropriate error if batch delete fails', async () => {
+      // Arrange
+      const canvasId = 'canvas-abc123';
+      const userId = 'user-123';
+      
+      const mockCanvasData = {
+        name: 'Test Canvas',
+        ownerId: userId,
+      };
+      
+      const mockObject1 = { ref: { id: 'obj-1' } };
+      
+      mockDoc.mockReturnValue({ id: canvasId });
+      mockGetDoc.mockResolvedValueOnce({
+        exists: () => true,
+        data: () => mockCanvasData,
+      });
+      mockCollection.mockReturnValue({ path: 'canvas-objects' });
+      mockGetDocs.mockResolvedValueOnce({
+        empty: false,
+        docs: [mockObject1],
+      });
+      mockWriteBatch.mockReturnValue(mockBatch);
+      mockBatch.commit.mockRejectedValue(new Error('Batch commit failed'));
+
+      // Act & Assert
+      await expect(deleteCanvas(canvasId, userId)).rejects.toThrow();
+    });
+
+    it('should handle case with zero objects gracefully', async () => {
+      // Arrange
+      const canvasId = 'canvas-abc123';
+      const userId = 'user-123';
+      
+      const mockCanvasData = {
+        name: 'Empty Canvas',
+        ownerId: userId,
+      };
+      
+      mockDoc.mockReturnValue({ id: canvasId });
+      mockGetDoc.mockResolvedValueOnce({
+        exists: () => true,
+        data: () => mockCanvasData,
+      });
+      mockGetDocs.mockResolvedValue({
+        empty: true,
+        docs: [],
+      });
+      mockDeleteDoc.mockResolvedValue(undefined);
+
+      // Act
+      await deleteCanvas(canvasId, userId);
+
+      // Assert
+      expect(mockWriteBatch).not.toHaveBeenCalled();
+      expect(mockBatch.delete).not.toHaveBeenCalled();
+      expect(mockDeleteDoc).toHaveBeenCalledTimes(2); // Canvas and user access
+    });
+
+    it('should handle case with 100+ objects (batch limits)', async () => {
+      // Arrange
+      const canvasId = 'canvas-abc123';
+      const userId = 'user-123';
+      
+      const mockCanvasData = {
+        name: 'Large Canvas',
+        ownerId: userId,
+      };
+      
+      // Create 100+ mock objects
+      const mockObjects = Array.from({ length: 150 }, (_, i) => ({
+        ref: { id: `obj-${i}` },
+      }));
+      
+      mockDoc.mockReturnValue({ id: canvasId });
+      mockGetDoc.mockResolvedValueOnce({
+        exists: () => true,
+        data: () => mockCanvasData,
+      });
+      mockCollection.mockReturnValue({ path: 'canvas-objects' });
+      mockGetDocs.mockResolvedValueOnce({
+        empty: false,
+        docs: mockObjects,
+      });
+      mockWriteBatch.mockReturnValue(mockBatch);
+      mockDeleteDoc.mockResolvedValue(undefined);
+
+      // Act
+      await deleteCanvas(canvasId, userId);
+
+      // Assert
+      expect(mockBatch.delete).toHaveBeenCalledTimes(150);
+      expect(mockBatch.commit).toHaveBeenCalled();
+    });
+
+    it('should not fail if user access cleanup fails', async () => {
+      // Arrange
+      const canvasId = 'canvas-abc123';
+      const userId = 'user-123';
+      
+      const mockCanvasData = {
+        name: 'Test Canvas',
+        ownerId: userId,
+      };
+      
+      mockDoc.mockReturnValue({ id: canvasId });
+      mockGetDoc.mockResolvedValueOnce({
+        exists: () => true,
+        data: () => mockCanvasData,
+      });
+      mockGetDocs.mockResolvedValue({ empty: true, docs: [] });
+      mockDeleteDoc
+        .mockResolvedValueOnce(undefined) // Canvas deletion succeeds
+        .mockRejectedValueOnce(new Error('Access cleanup failed')); // User access fails
+
+      // Act & Assert - should not throw
+      await expect(deleteCanvas(canvasId, userId)).resolves.not.toThrow();
     });
   });
 });

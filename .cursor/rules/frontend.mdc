@@ -1,0 +1,542 @@
+---
+Description: React, TypeScript, and frontend component guidelines for CollabCanvas
+Globs: src/components/**/*.tsx, src/hooks/**/*.ts
+---
+
+# Frontend Component & React Patterns
+
+## React Component Patterns
+
+### Functional Components Only
+Use functional components with hooks (no class components):
+
+```typescript
+import React, { useState, useEffect, useCallback } from 'react';
+
+interface ShapeProps {
+  shape: CanvasObject;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+  onDragEnd: (id: string, position: { x: number; y: number }) => void;
+}
+
+export const Shape: React.FC<ShapeProps> = React.memo(({ 
+  shape, 
+  isSelected, 
+  onSelect, 
+  onDragEnd 
+}) => {
+  // Component implementation
+});
+```
+
+### Component Organization
+
+```typescript
+// 1. Imports (grouped)
+import React, { useState, useEffect } from 'react';
+import { Rect } from 'react-konva';
+import { CanvasObject } from '@/types';
+
+// 2. Types/Interfaces
+interface Props {
+  // ...
+}
+
+// 3. Component
+export const Component: React.FC<Props> = (props) => {
+  // 4. State
+  const [state, setState] = useState();
+  
+  // 5. Effects
+  useEffect(() => {
+    // ...
+  }, []);
+  
+  // 6. Handlers
+  const handleClick = useCallback(() => {
+    // ...
+  }, []);
+  
+  // 7. Render
+  return (
+    // ...
+  );
+};
+
+// 8. Memoize if presentational
+export default React.memo(Component);
+```
+
+## Performance Optimization
+
+### Memoization Strategy
+
+**Use React.memo for:**
+- Presentational components (Shape, Cursor, CanvasCard)
+- Components that render frequently
+- Components with expensive computations
+
+```typescript
+export const Shape = React.memo<ShapeProps>(({ shape, isSelected }) => {
+  // ...
+}, (prevProps, nextProps) => {
+  // Custom comparison if needed
+  return prevProps.shape.id === nextProps.shape.id &&
+         prevProps.isSelected === nextProps.isSelected;
+});
+```
+
+**Use useMemo for:**
+- Expensive calculations
+- Derived state
+- Filtered/sorted arrays
+
+```typescript
+const visibleShapes = useMemo(() => 
+  shapes.filter(shape => isInViewport(shape, viewport)),
+  [shapes, viewport]
+);
+```
+
+**Use useCallback for:**
+- Event handlers passed as props
+- Functions used in dependencies
+- Functions passed to memoized children
+
+```typescript
+const handleDragEnd = useCallback((e: KonvaEventObject<DragEvent>) => {
+  const { x, y } = e.target.position();
+  onDragEnd(shape.id, { x, y });
+}, [shape.id, onDragEnd]);
+```
+
+### Avoid Re-renders
+
+**Bad:**
+```typescript
+// New object created every render
+<Shape onDragEnd={(id, pos) => handleDrag(id, pos)} />
+
+// Inline object
+<Shape style={{ color: 'blue' }} />
+```
+
+**Good:**
+```typescript
+// Stable reference with useCallback
+const handleDragEnd = useCallback((id, pos) => {
+  handleDrag(id, pos);
+}, [handleDrag]);
+
+// Defined outside or memoized
+const SHAPE_STYLE = { color: 'blue' };
+```
+
+## State Management
+
+### Local State (useState)
+Use for component-specific state:
+```typescript
+const [isHovered, setIsHovered] = useState(false);
+const [isEditing, setIsEditing] = useState(false);
+```
+
+### Context State
+Use for shared state across components:
+```typescript
+// In context provider
+const [shapes, setShapes] = useState<CanvasObject[]>([]);
+const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
+
+// In consumer
+const { shapes, selectedShapeId, selectShape } = useCanvas();
+```
+
+### Custom Hooks
+Extract complex logic:
+```typescript
+export function useRealtimeSync(canvasId: string) {
+  const [shapes, setShapes] = useState<CanvasObject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  
+  useEffect(() => {
+    setLoading(true);
+    const unsubscribe = canvasObjects.subscribeToCanvasObjects(
+      canvasId,
+      (newShapes) => {
+        setShapes(newShapes);
+        setLoading(false);
+      },
+      (err) => setError(err)
+    );
+    return unsubscribe;
+  }, [canvasId]);
+  
+  return { shapes, loading, error };
+}
+```
+
+## Event Handling
+
+### Konva Events
+```typescript
+// Canvas events
+<Stage
+  onMouseDown={handleStageMouseDown}
+  onMouseMove={handleStageMouseMove}
+  onMouseUp={handleStageMouseUp}
+  onWheel={handleWheel}
+  draggable
+  onDragEnd={handleStageDragEnd}
+>
+
+// Shape events
+<Rect
+  onClick={handleShapeClick}
+  onDragStart={handleShapeDragStart}
+  onDragEnd={handleShapeDragEnd}
+  onMouseEnter={handleMouseEnter}
+  onMouseLeave={handleMouseLeave}
+/>
+```
+
+### Standard DOM Events
+```typescript
+// Form submission
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  // ...
+};
+
+// Input change
+const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  setValue(e.target.value);
+};
+
+// Button click
+const handleClick = () => {
+  // ...
+};
+```
+
+## TypeScript Patterns
+
+### Component Props
+```typescript
+// Define props interface
+interface CanvasToolbarProps {
+  onAddShape: (type: ShapeType) => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onReset: () => void;
+  currentZoom: number;
+}
+
+// Optional props
+interface OptionalProps {
+  title?: string;
+  className?: string;
+  children?: React.ReactNode;
+}
+
+// Props with defaults
+const Component: React.FC<Props> = ({ 
+  title = 'Default Title',
+  className = ''
+}) => { ... };
+```
+
+### Event Types
+```typescript
+// Konva events
+import { KonvaEventObject } from 'konva/lib/Node';
+
+const handleDragEnd = (e: KonvaEventObject<DragEvent>) => {
+  const { x, y } = e.target.position();
+};
+
+// React events
+const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => { ... };
+const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => { ... };
+const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => { ... };
+```
+
+### Refs
+```typescript
+import { useRef } from 'react';
+import type { Stage } from 'konva/lib/Stage';
+
+const stageRef = useRef<Stage>(null);
+
+// Access in handler
+const handleExport = () => {
+  if (stageRef.current) {
+    const dataURL = stageRef.current.toDataURL();
+  }
+};
+```
+
+## Styling with Tailwind
+
+### Component Styling
+```typescript
+// Conditional classes
+className={`
+  px-4 py-2 rounded-lg
+  ${isSelected ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'}
+  ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-300'}
+`}
+
+// Compose classes
+const baseClasses = 'px-4 py-2 rounded-lg transition-colors';
+const variantClasses = isSelected ? 'bg-blue-500' : 'bg-gray-200';
+className={`${baseClasses} ${variantClasses}`}
+```
+
+### Responsive Design
+```typescript
+className="
+  w-full md:w-1/2 lg:w-1/3
+  text-sm md:text-base
+  p-4 md:p-6 lg:p-8
+"
+```
+
+## Form Handling
+
+### Controlled Inputs
+```typescript
+const [formData, setFormData] = useState({
+  name: '',
+  email: ''
+});
+
+const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  setFormData(prev => ({
+    ...prev,
+    [e.target.name]: e.target.value
+  }));
+};
+
+<input
+  type="text"
+  name="name"
+  value={formData.name}
+  onChange={handleChange}
+/>
+```
+
+### Form Validation
+```typescript
+const [errors, setErrors] = useState<Record<string, string>>({});
+
+const validate = () => {
+  const newErrors: Record<string, string> = {};
+  
+  if (!formData.name.trim()) {
+    newErrors.name = 'Name is required';
+  }
+  
+  if (!formData.email.includes('@')) {
+    newErrors.email = 'Invalid email';
+  }
+  
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!validate()) return;
+  // Submit form
+};
+```
+
+## Loading & Error States
+
+### Loading Pattern
+```typescript
+const [loading, setLoading] = useState(false);
+
+const handleAction = async () => {
+  setLoading(true);
+  try {
+    await someAsyncOperation();
+  } finally {
+    setLoading(false);
+  }
+};
+
+return (
+  <button disabled={loading}>
+    {loading ? <LoadingSpinner /> : 'Submit'}
+  </button>
+);
+```
+
+### Error Handling
+```typescript
+const [error, setError] = useState<string | null>(null);
+
+const handleAction = async () => {
+  setError(null);
+  try {
+    await someAsyncOperation();
+  } catch (err) {
+    setError(err instanceof Error ? err.message : 'An error occurred');
+  }
+};
+
+return (
+  <>
+    {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
+    <button onClick={handleAction}>Action</button>
+  </>
+);
+```
+
+## Context Usage
+
+### Provider Pattern
+```typescript
+// Create context
+export const CanvasContext = createContext<CanvasContextType | undefined>(undefined);
+
+// Provider component
+export const CanvasProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [shapes, setShapes] = useState<CanvasObject[]>([]);
+  
+  const value = useMemo(() => ({
+    shapes,
+    setShapes,
+    // ... other methods
+  }), [shapes]);
+  
+  return (
+    <CanvasContext.Provider value={value}>
+      {children}
+    </CanvasContext.Provider>
+  );
+};
+
+// Custom hook
+export const useCanvas = () => {
+  const context = useContext(CanvasContext);
+  if (!context) {
+    throw new Error('useCanvas must be used within CanvasProvider');
+  }
+  return context;
+};
+```
+
+## Component Testing
+
+### Test Structure
+```typescript
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { Shape } from './Shape';
+
+describe('Shape', () => {
+  it('renders with correct position', () => {
+    const shape = { id: '1', x: 100, y: 200, ... };
+    render(<Shape shape={shape} />);
+    // Test implementation
+  });
+  
+  it('calls onSelect when clicked', () => {
+    const onSelect = vi.fn();
+    render(<Shape shape={shape} onSelect={onSelect} />);
+    
+    fireEvent.click(screen.getByRole('button'));
+    expect(onSelect).toHaveBeenCalledWith(shape.id);
+  });
+});
+```
+
+## Common Patterns
+
+### Viewport Culling
+```typescript
+const visibleShapes = useMemo(() => {
+  const viewport = {
+    x: -stageX / scale,
+    y: -stageY / scale,
+    width: window.innerWidth / scale,
+    height: window.innerHeight / scale
+  };
+  
+  return shapes.filter(shape => 
+    shape.x + shape.width >= viewport.x &&
+    shape.x <= viewport.x + viewport.width &&
+    shape.y + shape.height >= viewport.y &&
+    shape.y <= viewport.y + viewport.height
+  );
+}, [shapes, stageX, stageY, scale]);
+```
+
+### Debouncing/Throttling
+```typescript
+import { useCallback, useRef } from 'react';
+
+function useThrottle<T extends (...args: any[]) => void>(
+  callback: T,
+  delay: number
+): T {
+  const lastRun = useRef(Date.now());
+  
+  return useCallback(((...args) => {
+    const now = Date.now();
+    if (now - lastRun.current >= delay) {
+      callback(...args);
+      lastRun.current = now;
+    }
+  }) as T, [callback, delay]);
+}
+
+// Usage
+const throttledUpdate = useThrottle(updateCursor, 16.6); // 60fps
+```
+
+## Accessibility
+
+### Semantic HTML
+```typescript
+<button type="button" onClick={handleClick}>
+  Add Shape
+</button>
+
+<form onSubmit={handleSubmit}>
+  <label htmlFor="canvas-name">
+    Canvas Name
+    <input id="canvas-name" type="text" />
+  </label>
+</form>
+```
+
+### ARIA Attributes
+```typescript
+<button
+  aria-label="Delete shape"
+  aria-pressed={isSelected}
+  aria-disabled={isDisabled}
+>
+  <TrashIcon />
+</button>
+```
+
+## Best Practices Checklist
+
+- ✅ Use TypeScript for all components
+- ✅ Memoize presentational components
+- ✅ Use useCallback for event handlers
+- ✅ Clean up subscriptions in useEffect
+- ✅ Handle loading and error states
+- ✅ Use Tailwind for styling
+- ✅ Test user interactions
+- ✅ Keep components focused (single responsibility)
+- ✅ Extract complex logic to hooks
+- ✅ Use semantic HTML
+- ✅ Optimize for 60 FPS

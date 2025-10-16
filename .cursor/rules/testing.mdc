@@ -1,0 +1,543 @@
+---
+Description: Testing patterns and guidelines for CollabCanvas using Vitest and React Testing Library
+Globs: tests/**/*.test.ts, tests/**/*.test.tsx
+---
+
+# Testing Guidelines
+
+## Testing Philosophy
+
+- **Test behavior, not implementation** - Focus on what users see and do
+- **80%+ coverage for services/utils** - Core logic must be well-tested
+- **Integration tests for critical flows** - Auth, canvas creation, collaboration
+- **Mock Firebase completely** - No real database calls in tests
+- **Fast execution** - Tests should run in milliseconds
+
+## Test File Organization
+
+```
+tests/
+├── unit/                       # Pure function tests
+│   ├── canvasHelpers.test.ts  # Canvas utilities
+│   ├── auth.service.test.ts   # Auth service
+│   ├── canvas.service.test.ts # Canvas metadata service
+│   └── canvasObjects.service.test.ts # Canvas objects service
+├── integration/                # User flow tests
+│   ├── auth-flow.test.tsx     # Register, login, logout
+│   ├── dashboard-flow.test.tsx # Canvas management
+│   └── canvas-operations.test.tsx # Shape creation, movement
+├── mocks/                      # Test mocks
+│   └── firebase.mock.ts       # Firebase mock setup
+└── setup.ts                    # Global test config
+```
+
+## Unit Testing Patterns
+
+### Service Testing Template
+```typescript
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { canvasObjects } from '@/services/canvasObjects.service';
+import { mockFirestore } from '../mocks/firebase.mock';
+
+describe('canvasObjects.service', () => {
+  beforeEach(() => {
+    // Setup mocks
+    vi.clearAllMocks();
+  });
+  
+  afterEach(() => {
+    // Cleanup
+  });
+  
+  describe('createShape', () => {
+    it('creates shape in correct canvas', async () => {
+      const canvasId = 'canvas-123';
+      const shape: CanvasObject = {
+        id: 'shape-1',
+        type: 'rectangle',
+        x: 100,
+        y: 200,
+        width: 150,
+        height: 100,
+        fill: '#3B82F6',
+        createdBy: 'user-1',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      await canvasObjects.createShape(canvasId, shape);
+      
+      expect(mockFirestore.setDoc).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: expect.stringContaining(canvasId)
+        }),
+        expect.objectContaining(shape)
+      );
+    });
+    
+    it('throws error if canvas not found', async () => {
+      mockFirestore.setDoc.mockRejectedValue(new Error('Canvas not found'));
+      
+      await expect(
+        canvasObjects.createShape('invalid-id', shape)
+      ).rejects.toThrow('Canvas not found');
+    });
+  });
+});
+```
+
+### Utility Testing Template
+```typescript
+import { describe, it, expect } from 'vitest';
+import { constrainZoom, getRelativePointerPosition } from '@/utils/canvasHelpers';
+
+describe('canvasHelpers', () => {
+  describe('constrainZoom', () => {
+    it('keeps zoom within min bounds', () => {
+      expect(constrainZoom(0.05)).toBe(0.1); // MIN_ZOOM
+    });
+    
+    it('keeps zoom within max bounds', () => {
+      expect(constrainZoom(5)).toBe(3); // MAX_ZOOM
+    });
+    
+    it('allows valid zoom values', () => {
+      expect(constrainZoom(1)).toBe(1);
+      expect(constrainZoom(2)).toBe(2);
+    });
+  });
+  
+  describe('getRelativePointerPosition', () => {
+    it('calculates correct canvas coordinates', () => {
+      const stage = {
+        getPointerPosition: () => ({ x: 500, y: 300 }),
+        x: () => -200,
+        y: () => -100,
+        scaleX: () => 2,
+        scaleY: () => 2
+      };
+      
+      const result = getRelativePointerPosition(stage as any);
+      
+      expect(result).toEqual({
+        x: 350,  // (500 - (-200)) / 2
+        y: 200   // (300 - (-100)) / 2
+      });
+    });
+    
+    it('handles null pointer position', () => {
+      const stage = {
+        getPointerPosition: () => null
+      };
+      
+      expect(getRelativePointerPosition(stage as any)).toBeNull();
+    });
+  });
+});
+```
+
+## Integration Testing Patterns
+
+### Component Testing Template
+```typescript
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { BrowserRouter } from 'react-router-dom';
+import { AuthProvider } from '@/context/AuthContext';
+import { LoginForm } from '@/components/auth/LoginForm';
+
+describe('LoginForm', () => {
+  const mockLogin = vi.fn();
+  
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+  
+  const renderComponent = () => {
+    return render(
+      <BrowserRouter>
+        <AuthProvider>
+          <LoginForm />
+        </AuthProvider>
+      </BrowserRouter>
+    );
+  };
+  
+  it('renders login form with email and password fields', () => {
+    renderComponent();
+    
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /log in/i })).toBeInTheDocument();
+  });
+  
+  it('shows error for invalid credentials', async () => {
+    mockLogin.mockRejectedValue(new Error('Invalid credentials'));
+    renderComponent();
+    
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'test@example.com' }
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: 'wrongpassword' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: /log in/i }));
+    
+    await waitFor(() => {
+      expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument();
+    });
+  });
+  
+  it('redirects to dashboard on successful login', async () => {
+    mockLogin.mockResolvedValue({ uid: 'user-123' });
+    renderComponent();
+    
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'test@example.com' }
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: 'correctpassword' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: /log in/i }));
+    
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/dashboard');
+    });
+  });
+});
+```
+
+### User Flow Testing Template
+```typescript
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi } from 'vitest';
+
+describe('Dashboard Flow', () => {
+  it('allows user to create new canvas', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    
+    // Login first
+    await user.type(screen.getByLabelText(/email/i), 'test@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.click(screen.getByRole('button', { name: /log in/i }));
+    
+    // Wait for dashboard
+    await waitFor(() => {
+      expect(screen.getByText(/dashboard/i)).toBeInTheDocument();
+    });
+    
+    // Click create canvas
+    await user.click(screen.getByRole('button', { name: /create new canvas/i }));
+    
+    // Fill modal
+    await user.type(screen.getByLabelText(/canvas name/i), 'My Test Canvas');
+    await user.click(screen.getByRole('button', { name: /create/i }));
+    
+    // Verify canvas appears
+    await waitFor(() => {
+      expect(screen.getByText('My Test Canvas')).toBeInTheDocument();
+    });
+  });
+});
+```
+
+## Firebase Mocking
+
+### Mock Setup (tests/mocks/firebase.mock.ts)
+```typescript
+import { vi } from 'vitest';
+
+// Mock Firestore
+export const mockFirestore = {
+  collection: vi.fn(),
+  doc: vi.fn(),
+  setDoc: vi.fn(),
+  getDoc: vi.fn(),
+  getDocs: vi.fn(),
+  updateDoc: vi.fn(),
+  deleteDoc: vi.fn(),
+  onSnapshot: vi.fn(),
+  query: vi.fn(),
+  where: vi.fn()
+};
+
+// Mock Auth
+export const mockAuth = {
+  currentUser: null,
+  signInWithEmailAndPassword: vi.fn(),
+  createUserWithEmailAndPassword: vi.fn(),
+  signOut: vi.fn(),
+  onAuthStateChanged: vi.fn()
+};
+
+// Mock Firebase Admin
+vi.mock('firebase/firestore', () => ({
+  getFirestore: () => mockFirestore,
+  collection: mockFirestore.collection,
+  doc: mockFirestore.doc,
+  setDoc: mockFirestore.setDoc,
+  getDoc: mockFirestore.getDoc,
+  getDocs: mockFirestore.getDocs,
+  updateDoc: mockFirestore.updateDoc,
+  deleteDoc: mockFirestore.deleteDoc,
+  onSnapshot: mockFirestore.onSnapshot,
+  serverTimestamp: () => new Date(),
+  Timestamp: {
+    now: () => new Date(),
+    fromDate: (date: Date) => date
+  }
+}));
+
+vi.mock('firebase/auth', () => ({
+  getAuth: () => mockAuth,
+  signInWithEmailAndPassword: mockAuth.signInWithEmailAndPassword,
+  createUserWithEmailAndPassword: mockAuth.createUserWithEmailAndPassword,
+  signOut: mockAuth.signOut,
+  onAuthStateChanged: mockAuth.onAuthStateChanged
+}));
+```
+
+### Using Mocks in Tests
+```typescript
+import { mockFirestore, mockAuth } from '../mocks/firebase.mock';
+
+beforeEach(() => {
+  // Setup mock behavior
+  mockFirestore.getDoc.mockResolvedValue({
+    exists: () => true,
+    data: () => ({ name: 'Test Canvas' })
+  });
+  
+  mockAuth.signInWithEmailAndPassword.mockResolvedValue({
+    user: { uid: 'user-123', email: 'test@example.com' }
+  });
+});
+```
+
+## Testing Hooks
+
+### Custom Hook Testing
+```typescript
+import { renderHook, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { useRealtimeSync } from '@/hooks/useRealtimeSync';
+
+describe('useRealtimeSync', () => {
+  it('subscribes to canvas objects', async () => {
+    const canvasId = 'canvas-123';
+    const mockShapes = [
+      { id: 'shape-1', type: 'rectangle', x: 0, y: 0 }
+    ];
+    
+    mockFirestore.onSnapshot.mockImplementation((query, callback) => {
+      callback({
+        docs: mockShapes.map(shape => ({
+          id: shape.id,
+          data: () => shape
+        }))
+      });
+      return vi.fn(); // unsubscribe function
+    });
+    
+    const { result } = renderHook(() => useRealtimeSync(canvasId));
+    
+    await waitFor(() => {
+      expect(result.current).toEqual(mockShapes);
+    });
+  });
+  
+  it('cleans up subscription on unmount', () => {
+    const unsubscribe = vi.fn();
+    mockFirestore.onSnapshot.mockReturnValue(unsubscribe);
+    
+    const { unmount } = renderHook(() => useRealtimeSync('canvas-123'));
+    
+    unmount();
+    expect(unsubscribe).toHaveBeenCalled();
+  });
+});
+```
+
+## Testing Checklist
+
+### Before Writing Tests
+- ✅ Identify what behavior to test (not implementation)
+- ✅ Set up appropriate mocks
+- ✅ Consider edge cases and error scenarios
+
+### Test Structure
+- ✅ Descriptive test names (should read like documentation)
+- ✅ Arrange-Act-Assert pattern
+- ✅ One assertion per test (generally)
+- ✅ Clean up after each test
+
+### Coverage Goals
+- ✅ 80%+ for services and utilities
+- ✅ Critical user flows covered in integration tests
+- ✅ Error cases tested
+- ✅ Edge cases covered
+
+## Common Testing Patterns
+
+### Testing Async Operations
+```typescript
+it('loads data asynchronously', async () => {
+  mockFirestore.getDoc.mockResolvedValue({
+    exists: () => true,
+    data: () => ({ name: 'Test' })
+  });
+  
+  render(<Component />);
+  
+  await waitFor(() => {
+    expect(screen.getByText('Test')).toBeInTheDocument();
+  });
+});
+```
+
+### Testing Error States
+```typescript
+it('displays error message on failure', async () => {
+  mockFirestore.getDoc.mockRejectedValue(new Error('Network error'));
+  
+  render(<Component />);
+  
+  await waitFor(() => {
+    expect(screen.getByText(/network error/i)).toBeInTheDocument();
+  });
+});
+```
+
+### Testing Loading States
+```typescript
+it('shows loading spinner while fetching', () => {
+  mockFirestore.getDoc.mockImplementation(
+    () => new Promise(resolve => setTimeout(resolve, 100))
+  );
+  
+  render(<Component />);
+  
+  expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
+});
+```
+
+### Testing User Interactions
+```typescript
+it('calls handler when button clicked', async () => {
+  const handleClick = vi.fn();
+  render(<Button onClick={handleClick}>Click Me</Button>);
+  
+  await userEvent.click(screen.getByRole('button'));
+  
+  expect(handleClick).toHaveBeenCalledTimes(1);
+});
+```
+
+## Testing Canvas Isolation
+
+Critical for multi-canvas architecture:
+
+```typescript
+describe('Canvas Isolation', () => {
+  it('creates shapes in correct canvas', async () => {
+    const canvasA = 'canvas-aaa';
+    const canvasB = 'canvas-bbb';
+    
+    await canvasObjects.createShape(canvasA, shapeForA);
+    await canvasObjects.createShape(canvasB, shapeForB);
+    
+    expect(mockFirestore.setDoc).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: expect.stringContaining(canvasA)
+      }),
+      expect.objectContaining(shapeForA)
+    );
+    
+    expect(mockFirestore.setDoc).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: expect.stringContaining(canvasB)
+      }),
+      expect.objectContaining(shapeForB)
+    );
+  });
+  
+  it('subscribes only to correct canvas', () => {
+    const canvasId = 'canvas-123';
+    renderHook(() => useRealtimeSync(canvasId));
+    
+    expect(mockFirestore.onSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: expect.stringContaining(canvasId)
+      }),
+      expect.any(Function)
+    );
+  });
+});
+```
+
+## Running Tests
+
+```bash
+# Run all tests
+npm run test
+
+# Run specific test file
+npm run test tests/unit/canvasHelpers.test.ts
+
+# Watch mode (for active development)
+npm run test -- --watch
+
+# Coverage report
+npm run test -- --coverage
+
+# Run only unit tests
+npm run test tests/unit
+
+# Run only integration tests
+npm run test tests/integration
+```
+
+## Test Output
+
+### Good Test Names (Readable)
+```
+✓ canvasHelpers
+  ✓ constrainZoom
+    ✓ keeps zoom within min bounds
+    ✓ keeps zoom within max bounds
+    ✓ allows valid zoom values
+  ✓ getRelativePointerPosition
+    ✓ calculates correct canvas coordinates
+    ✓ handles null pointer position
+```
+
+### Bad Test Names (Not Clear)
+```
+✓ test1
+✓ test2
+✓ it works
+```
+
+## Debugging Failed Tests
+
+1. **Read the error message carefully** - Vitest provides good error messages
+2. **Check mock setup** - Are mocks returning expected values?
+3. **Add console.log** - Debug what's actually happening
+4. **Use screen.debug()** - See rendered HTML
+5. **Check async timing** - Use waitFor() for async updates
+6. **Verify cleanup** - Are previous tests affecting current test?
+
+## Best Practices
+
+- ✅ Test behavior, not implementation details
+- ✅ Mock Firebase completely (no real DB calls)
+- ✅ Use descriptive test names
+- ✅ Keep tests focused and simple
+- ✅ Test error cases and edge cases
+- ✅ Clean up mocks between tests
+- ✅ Use userEvent over fireEvent for user interactions
+- ✅ Wait for async updates with waitFor()
+- ✅ Test canvas isolation for multi-canvas features
+- ✅ Maintain 80%+ coverage for services/utils

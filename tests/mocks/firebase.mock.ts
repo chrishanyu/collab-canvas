@@ -33,6 +33,13 @@ export const mockDeleteDoc = vi.fn();
 export const mockOnSnapshot = vi.fn();
 export const mockOrderBy = vi.fn();
 export const mockServerTimestamp = vi.fn(() => ({ _seconds: Date.now() / 1000 }));
+export const mockWriteBatch = vi.fn();
+
+// Mock batch object
+export const mockBatch = {
+  delete: vi.fn(),
+  commit: vi.fn().mockResolvedValue(undefined),
+};
 
 // Mock Timestamp class
 export class MockTimestamp {
@@ -84,6 +91,7 @@ vi.mock('firebase/firestore', () => ({
   query: (...args: unknown[]) => mockQuery(...args),
   where: (...args: unknown[]) => mockWhere(...args),
   orderBy: (...args: unknown[]) => mockOrderBy(...args),
+  writeBatch: (...args: unknown[]) => mockWriteBatch(...args),
   serverTimestamp: () => mockServerTimestamp(),
   Timestamp: MockTimestamp,
   getFirestore: vi.fn(() => mockDb),
@@ -112,6 +120,10 @@ export const resetAllMocks = () => {
   mockQuery.mockReset();
   mockWhere.mockReset();
   mockOrderBy.mockReset();
+  mockWriteBatch.mockReset();
+  mockBatch.delete.mockClear();
+  mockBatch.commit.mockClear();
+  mockBatch.commit.mockResolvedValue(undefined);
   mockAuth.currentUser = null;
 };
 
