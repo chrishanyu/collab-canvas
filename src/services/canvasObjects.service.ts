@@ -10,7 +10,8 @@ import {
   serverTimestamp,
   Timestamp,
   query,
-  orderBy
+  orderBy,
+  increment
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { CanvasObject } from '../types';
@@ -72,6 +73,8 @@ export function subscribeToCanvasObjects(
             createdBy: data.createdBy,
             createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
             updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
+            version: data.version || 1, // Default to 1 for backward compatibility
+            lastEditedBy: data.lastEditedBy,
           });
         });
         
@@ -118,6 +121,8 @@ export async function getCanvasObjects(canvasId: string): Promise<CanvasObject[]
         createdBy: data.createdBy,
         createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
         updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
+        version: data.version || 1, // Default to 1 for backward compatibility
+        lastEditedBy: data.lastEditedBy,
       });
     });
     
@@ -131,12 +136,12 @@ export async function getCanvasObjects(canvasId: string): Promise<CanvasObject[]
 /**
  * Creates a new shape in a canvas
  * @param canvasId - Canvas ID
- * @param shape - Shape data (without id, createdAt, updatedAt)
+ * @param shape - Shape data (without id, createdAt, updatedAt, version, lastEditedBy)
  * @returns Created shape with id and timestamps
  */
 export async function createShape(
   canvasId: string,
-  shape: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt'>
+  shape: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'lastEditedBy'>
 ): Promise<CanvasObject> {
   try {
     // Generate unique shape ID
@@ -144,7 +149,7 @@ export async function createShape(
     const shapeRef = doc(objectsRef);
     const shapeId = shapeRef.id;
     
-    // Shape data with timestamps
+    // Shape data with timestamps and version tracking
     const shapeData = {
       id: shapeId,
       type: shape.type,
@@ -156,6 +161,8 @@ export async function createShape(
       createdBy: shape.createdBy,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      version: 1, // Initial version
+      lastEditedBy: shape.createdBy, // Set to creator initially
     };
     
     // Create shape document
@@ -178,11 +185,13 @@ export async function createShape(
  * @param canvasId - Canvas ID
  * @param shapeId - Shape ID
  * @param updates - Partial shape data to update
+ * @param userId - ID of user making the update (for version tracking)
  */
 export async function updateShape(
   canvasId: string,
   shapeId: string,
-  updates: Partial<Omit<CanvasObject, 'id' | 'createdAt' | 'createdBy'>>
+  updates: Partial<Omit<CanvasObject, 'id' | 'createdAt' | 'createdBy' | 'version' | 'lastEditedBy'>>,
+  userId?: string
 ): Promise<void> {
   try {
     const shapeRef = getObjectDoc(canvasId, shapeId);
@@ -193,11 +202,19 @@ export async function updateShape(
       throw new Error(`Shape ${shapeId} not found in canvas ${canvasId}`);
     }
     
-    // Update with server timestamp
-    await updateDoc(shapeRef, {
+    // Update with server timestamp, increment version, and track editor
+    const updateData: Record<string, any> = {
       ...updates,
       updatedAt: serverTimestamp(),
-    });
+      version: increment(1), // Increment version for conflict detection
+    };
+    
+    // Add lastEditedBy if userId is provided
+    if (userId) {
+      updateData.lastEditedBy = userId;
+    }
+    
+    await updateDoc(shapeRef, updateData);
   } catch (error) {
     console.error('Error updating shape:', error);
     // Rethrow specific errors (like "not found")

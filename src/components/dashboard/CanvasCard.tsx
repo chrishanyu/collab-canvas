@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
 import { deleteCanvas } from '../../services/canvas.service';
 import type { Canvas } from '../../types';
 import { DeleteCanvasModal } from './DeleteCanvasModal';
@@ -14,6 +15,7 @@ interface CanvasCardProps {
 export const CanvasCard: React.FC<CanvasCardProps> = ({ canvas, onShare, onDelete }) => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const { showError, showSuccess } = useToast();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -41,11 +43,14 @@ export const CanvasCard: React.FC<CanvasCardProps> = ({ canvas, onShare, onDelet
       setIsDeleting(true);
       await deleteCanvas(canvas.id, currentUser.id);
       
-      // Success - close modal and refresh dashboard
+      // Success - show success message, close modal and refresh dashboard
+      showSuccess('Canvas deleted successfully');
       setShowDeleteModal(false);
       onDelete(); // Refresh dashboard
     } catch (error) {
-      // Error handling - log error but don't show alert
+      // Error handling - show error notification
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete canvas';
+      showError(errorMessage);
       console.error('Error deleting canvas:', error);
     } finally {
       setIsDeleting(false);

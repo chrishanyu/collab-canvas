@@ -31,6 +31,8 @@ export interface CanvasObject {
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
+  version: number; // For conflict detection - increments on each update
+  lastEditedBy?: string; // Tracks which user last edited this object
 }
 
 // Presence types

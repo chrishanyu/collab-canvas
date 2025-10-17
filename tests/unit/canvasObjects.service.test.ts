@@ -11,6 +11,7 @@ import {
   mockQuery,
   mockOrderBy,
   mockTimestamp,
+  mockIncrement,
   MockTimestamp,
   resetAllMocks,
 } from '../mocks/firebase.mock';
@@ -84,6 +85,8 @@ describe('Canvas Objects Service', () => {
         createdBy: 'user-123',
         createdAt: expect.any(Date),
         updatedAt: expect.any(Date),
+        version: 1,
+        lastEditedBy: 'user-123',
       });
     });
 
@@ -425,6 +428,8 @@ describe('Canvas Objects Service', () => {
         createdBy: 'user-123',
         createdAt: expect.any(Date),
         updatedAt: expect.any(Date),
+        version: 1, // Default for backward compatibility
+        lastEditedBy: undefined, // Not present in mock data
       });
       expect(result[1].id).toBe('shape-2');
     });
@@ -630,6 +635,249 @@ describe('Canvas Objects Service', () => {
         canvasIdB,
         'objects'
       );
+    });
+  });
+
+  describe('Version Tracking', () => {
+    describe('createShape - version tracking', () => {
+      it('should set initial version to 1 when creating a shape', async () => {
+        // Arrange
+        const canvasId = 'canvas-123';
+        const shape = {
+          type: 'rectangle' as const,
+          x: 100,
+          y: 200,
+          width: 150,
+          height: 100,
+          fill: '#3B82F6',
+          createdBy: 'user-123',
+        };
+        
+        const mockShapeRef = { id: 'shape-abc123' };
+        mockCollection.mockReturnValue({ docs: [] });
+        mockDoc.mockReturnValue(mockShapeRef);
+        mockSetDoc.mockResolvedValue(undefined);
+
+        // Act
+        await createShape(canvasId, shape);
+
+        // Assert - verify version is set to 1
+        expect(mockSetDoc).toHaveBeenCalledWith(
+          mockShapeRef,
+          expect.objectContaining({
+            version: 1,
+          })
+        );
+      });
+
+      it('should set lastEditedBy to creator when creating a shape', async () => {
+        // Arrange
+        const canvasId = 'canvas-123';
+        const userId = 'user-456';
+        const shape = {
+          type: 'circle' as const,
+          x: 50,
+          y: 75,
+          width: 100,
+          height: 100,
+          fill: '#FF5733',
+          createdBy: userId,
+        };
+        
+        const mockShapeRef = { id: 'shape-xyz789' };
+        mockCollection.mockReturnValue({ docs: [] });
+        mockDoc.mockReturnValue(mockShapeRef);
+        mockSetDoc.mockResolvedValue(undefined);
+
+        // Act
+        await createShape(canvasId, shape);
+
+        // Assert - verify lastEditedBy is set to creator
+        expect(mockSetDoc).toHaveBeenCalledWith(
+          mockShapeRef,
+          expect.objectContaining({
+            lastEditedBy: userId,
+          })
+        );
+      });
+
+      it('should include both version and lastEditedBy in created shape', async () => {
+        // Arrange
+        const canvasId = 'canvas-123';
+        const userId = 'user-789';
+        const shape = {
+          type: 'rectangle' as const,
+          x: 10,
+          y: 20,
+          width: 30,
+          height: 40,
+          fill: '#00FF00',
+          createdBy: userId,
+        };
+        
+        const mockShapeRef = { id: 'shape-new' };
+        mockCollection.mockReturnValue({ docs: [] });
+        mockDoc.mockReturnValue(mockShapeRef);
+        mockSetDoc.mockResolvedValue(undefined);
+
+        // Act
+        await createShape(canvasId, shape);
+
+        // Assert - verify both fields are present
+        expect(mockSetDoc).toHaveBeenCalledWith(
+          mockShapeRef,
+          expect.objectContaining({
+            version: 1,
+            lastEditedBy: userId,
+          })
+        );
+      });
+    });
+
+    describe('updateShape - version tracking', () => {
+      it('should increment version using Firestore increment()', async () => {
+        // Arrange
+        const canvasId = 'canvas-123';
+        const shapeId = 'shape-abc';
+        const updates = { x: 150, y: 250 };
+        const userId = 'user-123';
+
+        mockDoc.mockReturnValue({ id: shapeId });
+        mockGetDoc.mockResolvedValue({
+          exists: () => true,
+          data: () => ({ version: 2 }),
+        });
+        mockUpdateDoc.mockResolvedValue(undefined);
+
+        // Act
+        await updateShape(canvasId, shapeId, updates, userId);
+
+        // Assert - verify increment(1) was called
+        expect(mockIncrement).toHaveBeenCalledWith(1);
+        
+        // Verify updateDoc was called with the increment result
+        expect(mockUpdateDoc).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            version: { _increment: 1 }, // This is what mockIncrement returns
+          })
+        );
+      });
+
+      it('should set lastEditedBy to the user making the update', async () => {
+        // Arrange
+        const canvasId = 'canvas-123';
+        const shapeId = 'shape-xyz';
+        const updates = { fill: '#FF0000' };
+        const userId = 'user-456';
+
+        mockDoc.mockReturnValue({ id: shapeId });
+        mockGetDoc.mockResolvedValue({
+          exists: () => true,
+          data: () => ({}),
+        });
+        mockUpdateDoc.mockResolvedValue(undefined);
+
+        // Act
+        await updateShape(canvasId, shapeId, updates, userId);
+
+        // Assert - verify lastEditedBy is set
+        expect(mockUpdateDoc).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            lastEditedBy: userId,
+          })
+        );
+      });
+
+      it('should not set lastEditedBy if userId is not provided', async () => {
+        // Arrange
+        const canvasId = 'canvas-123';
+        const shapeId = 'shape-xyz';
+        const updates = { x: 100 };
+
+        mockDoc.mockReturnValue({ id: shapeId });
+        mockGetDoc.mockResolvedValue({
+          exists: () => true,
+          data: () => ({}),
+        });
+        mockUpdateDoc.mockResolvedValue(undefined);
+
+        // Act
+        await updateShape(canvasId, shapeId, updates); // No userId
+
+        // Assert - verify lastEditedBy is not in the update
+        const updateCall = mockUpdateDoc.mock.calls[0][1] as Record<string, any>;
+        expect(updateCall).not.toHaveProperty('lastEditedBy');
+        // But version should still be incremented
+        expect(updateCall.version).toEqual({ _increment: 1 });
+      });
+
+      it('should include both version increment and lastEditedBy in update', async () => {
+        // Arrange
+        const canvasId = 'canvas-123';
+        const shapeId = 'shape-abc';
+        const updates = { x: 200, y: 300, width: 100 };
+        const userId = 'user-999';
+
+        mockDoc.mockReturnValue({ id: shapeId });
+        mockGetDoc.mockResolvedValue({
+          exists: () => true,
+          data: () => ({ version: 5 }),
+        });
+        mockUpdateDoc.mockResolvedValue(undefined);
+
+        // Act
+        await updateShape(canvasId, shapeId, updates, userId);
+
+        // Assert - verify both version and lastEditedBy are included
+        expect(mockUpdateDoc).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            version: { _increment: 1 },
+            lastEditedBy: userId,
+            ...updates,
+          })
+        );
+      });
+
+      it('should preserve other update data while adding version tracking', async () => {
+        // Arrange
+        const canvasId = 'canvas-123';
+        const shapeId = 'shape-test';
+        const updates = {
+          x: 50,
+          y: 75,
+          width: 200,
+          height: 150,
+          fill: '#BLUE',
+        };
+        const userId = 'user-abc';
+
+        mockDoc.mockReturnValue({ id: shapeId });
+        mockGetDoc.mockResolvedValue({
+          exists: () => true,
+          data: () => ({}),
+        });
+        mockUpdateDoc.mockResolvedValue(undefined);
+
+        // Act
+        await updateShape(canvasId, shapeId, updates, userId);
+
+        // Assert - verify all original updates are preserved
+        expect(mockUpdateDoc).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            x: 50,
+            y: 75,
+            width: 200,
+            height: 150,
+            fill: '#BLUE',
+            version: { _increment: 1 },
+            lastEditedBy: userId,
+          })
+        );
+      });
     });
   });
 });
