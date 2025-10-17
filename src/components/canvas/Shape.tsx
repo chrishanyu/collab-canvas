@@ -7,6 +7,7 @@ interface ShapeProps {
   shape: CanvasObject;
   isSelected: boolean;
   onSelect: (id: string) => void;
+  onDragStart: (id: string) => void;
   onDragEnd: (id: string, x: number, y: number) => void;
 }
 
@@ -20,8 +21,12 @@ interface ShapeProps {
  * This prevents unnecessary re-renders when other shapes change,
  * dramatically improving performance with many shapes (500+)
  */
-export const Shape = React.memo(({ shape, isSelected, onSelect, onDragEnd }: ShapeProps) => {
+export const Shape = React.memo(({ shape, isSelected, onSelect, onDragStart, onDragEnd }: ShapeProps) => {
   const [isHovered, setIsHovered] = useState(false);
+
+  const handleDragStart = () => {
+    onDragStart(shape.id);
+  };
 
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target;
@@ -44,6 +49,7 @@ export const Shape = React.memo(({ shape, isSelected, onSelect, onDragEnd }: Sha
         draggable
         onClick={handleClick}
         onTap={handleClick}
+        onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         // Visual feedback
         stroke={isSelected ? '#10B981' : isHovered ? '#6B7280' : undefined}
