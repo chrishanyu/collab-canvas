@@ -34,6 +34,7 @@ export const mockOnSnapshot = vi.fn();
 export const mockOrderBy = vi.fn();
 export const mockServerTimestamp = vi.fn(() => ({ _seconds: Date.now() / 1000 }));
 export const mockWriteBatch = vi.fn();
+export const mockIncrement = vi.fn((value: number) => ({ _increment: value }));
 
 // Mock batch object
 export const mockBatch = {
@@ -93,6 +94,7 @@ vi.mock('firebase/firestore', () => ({
   orderBy: (...args: unknown[]) => mockOrderBy(...args),
   writeBatch: (...args: unknown[]) => mockWriteBatch(...args),
   serverTimestamp: () => mockServerTimestamp(),
+  increment: (value: number) => mockIncrement(value),
   Timestamp: MockTimestamp,
   getFirestore: vi.fn(() => mockDb),
 }));
@@ -121,6 +123,8 @@ export const resetAllMocks = () => {
   mockWhere.mockReset();
   mockOrderBy.mockReset();
   mockWriteBatch.mockReset();
+  mockIncrement.mockReset();
+  mockIncrement.mockImplementation((value: number) => ({ _increment: value }));
   mockBatch.delete.mockClear();
   mockBatch.commit.mockClear();
   mockBatch.commit.mockResolvedValue(undefined);

@@ -19,7 +19,7 @@ export const useCanvas = () => {
     fill: string,
     createdBy: string
   ): CanvasObject => {
-    const shapeData: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt'> = {
+    const shapeData: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'lastEditedBy'> = {
       type: 'rectangle',
       x,
       y,

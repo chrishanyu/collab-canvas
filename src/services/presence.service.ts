@@ -142,6 +142,7 @@ export const subscribeToPresence = (
  * @param _canvasId - The canvas ID to scope presence to
  * @param _userId - User ID
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const setupDisconnectCleanup = async (
   _canvasId: string,
   _userId: string

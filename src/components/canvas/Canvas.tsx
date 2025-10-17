@@ -4,10 +4,13 @@ import { Stage, Layer } from 'react-konva';
 import Konva from 'konva';
 import { useAuth } from '../../hooks/useAuth';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
+import { useToast } from '../../hooks/useToast';
+import { usePersistedViewport } from '../../hooks/usePersistedViewport';
 import { getCanvasById } from '../../services/canvas.service';
 import { createShape as createShapeInFirebase, updateShape as updateShapeInFirebase } from '../../services/canvasObjects.service';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { ErrorAlert } from '../common/ErrorAlert';
+import { ConnectionIndicator } from '../common/ConnectionIndicator';
 import { CanvasToolbar } from './CanvasToolbar';
 import { Shape } from './Shape';
 import { GridDots } from './GridDots';
@@ -45,6 +48,7 @@ const HEADER_HEIGHT = 60;
 export const Canvas: React.FC = () => {
   const { canvasId } = useParams<{ canvasId: string }>();
   const { currentUser } = useAuth();
+  const { showError } = useToast();
   const stageRef = useRef<Konva.Stage>(null);
 
   const [canvas, setCanvas] = useState<CanvasType | null>(null);
@@ -55,10 +59,15 @@ export const Canvas: React.FC = () => {
   const [stageWidth, setStageWidth] = useState(window.innerWidth);
   const [stageHeight, setStageHeight] = useState(window.innerHeight);
 
-  // Stage position and scale
-  const [stageScale, setStageScale] = useState(DEFAULT_ZOOM);
-  const [stageX, setStageX] = useState(DEFAULT_CANVAS_X);
-  const [stageY, setStageY] = useState(DEFAULT_CANVAS_Y);
+  // Stage position and scale (persisted in localStorage)
+  const {
+    stageScale,
+    setStageScale,
+    stageX,
+    setStageX,
+    stageY,
+    setStageY,
+  } = usePersistedViewport(canvasId || 'default');
 
   // Shape state
   const [shapes, setShapes] = useState<CanvasObject[]>([]);
@@ -101,7 +110,6 @@ export const Canvas: React.FC = () => {
 
   // Real-time sync: Subscribe to Firestore changes for this canvas
   const handleShapesUpdate = useCallback((syncedShapes: CanvasObject[]) => {
-    console.log('handleShapesUpdate', syncedShapes);
     setShapes(syncedShapes);
   }, []);
 
@@ -234,6 +242,8 @@ export const Canvas: React.FC = () => {
       id: generateUniqueId(),
       createdAt: new Date(),
       updatedAt: new Date(),
+      version: 1, // Initial version
+      lastEditedBy: currentUser.id, // Set to creator
     };
     setShapes([...shapes, optimisticShape]);
 
@@ -243,6 +253,8 @@ export const Canvas: React.FC = () => {
       // Firestore listener will update with the actual shape from server
     } catch (error) {
       console.error('Failed to create shape in Firebase:', error);
+      // Show error notification to user
+      showError('Failed to create shape. Please try again.');
       // Revert optimistic update on error
       setShapes(shapes); // Remove the optimistic shape
     }
@@ -254,24 +266,44 @@ export const Canvas: React.FC = () => {
   };
 
   const handleShapeDragEnd = async (id: string, x: number, y: number) => {
-    if (!canvasId) return;
+    if (!canvasId || !currentUser) return;
 
-    // Optimistic update: Update local state immediately
+    // Store original shape for rollback
+    const originalShape = shapes.find(shape => shape.id === id);
+
+    // Optimistic update: Update local state immediately with version increment
     setShapes(
       shapes.map((shape) =>
         shape.id === id
-          ? { ...shape, x, y, updatedAt: new Date() }
+          ? { 
+              ...shape, 
+              x, 
+              y, 
+              updatedAt: new Date(),
+              version: shape.version + 1, // Increment version optimistically
+              lastEditedBy: currentUser.id, // Track who edited
+            }
           : shape
       )
     );
 
     // Write to Firebase (async, fire and forget)
     try {
-      await updateShapeInFirebase(canvasId, id, { x, y });
+      await updateShapeInFirebase(canvasId, id, { x, y }, currentUser.id);
       // Firestore listener will confirm the update
     } catch (error) {
       console.error('Failed to update shape in Firebase:', error);
-      // Could implement rollback here if needed
+      // Show error notification to user
+      showError('Failed to save changes. Please try again.');
+      
+      // Rollback: Restore original position
+      if (originalShape) {
+        setShapes(
+          shapes.map((shape) =>
+            shape.id === id ? originalShape : shape
+          )
+        );
+      }
     }
   };
 
@@ -375,6 +407,9 @@ export const Canvas: React.FC = () => {
       className="relative w-full h-screen overflow-hidden bg-gray-200"
       onMouseMove={handleMouseMove}
     >
+      {/* Connection Status Indicator */}
+      <ConnectionIndicator />
+
       {/* Canvas Header */}
       <div className="absolute top-0 left-0 right-0 z-10 bg-white shadow-sm px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
