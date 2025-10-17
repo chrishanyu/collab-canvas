@@ -5,7 +5,7 @@ export interface CanvasContextType {
   shapes: CanvasObject[];
   selectedShapeId: string | null;
   isCreatingShape: boolean;
-  createShape: (shape: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt'>) => CanvasObject;
+  createShape: (shape: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'lastEditedBy'>) => CanvasObject;
   updateShape: (id: string, updates: Partial<CanvasObject>) => void;
   deleteShape: (id: string) => void;
   selectShape: (id: string | null) => void;

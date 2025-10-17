@@ -203,7 +203,7 @@ export async function updateShape(
     }
     
     // Update with server timestamp, increment version, and track editor
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, unknown> = {
       ...updates,
       updatedAt: serverTimestamp(),
       version: increment(1), // Increment version for conflict detection

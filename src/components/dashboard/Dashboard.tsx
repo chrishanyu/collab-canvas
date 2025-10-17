@@ -44,19 +44,15 @@ export const Dashboard: React.FC = () => {
   const handleCreateCanvas = async (name: string) => {
     if (!currentUser) return;
 
-    try {
-      const newCanvas = await createCanvas(
-        name,
-        currentUser.id,
-        currentUser.displayName
-      );
-      
-      // Close modal and navigate to new canvas
-      setIsCreateModalOpen(false);
-      navigate(`/canvas/${newCanvas.id}`);
-    } catch (err) {
-      throw err; // Let modal handle the error display
-    }
+    const newCanvas = await createCanvas(
+      name,
+      currentUser.id,
+      currentUser.displayName
+    );
+    
+    // Close modal and navigate to new canvas
+    setIsCreateModalOpen(false);
+    navigate(`/canvas/${newCanvas.id}`);
   };
 
   const handleShareCanvas = (canvas: Canvas) => {

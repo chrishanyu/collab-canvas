@@ -17,12 +17,14 @@ export const CanvasProvider: React.FC<CanvasProviderProps> = ({ children }) => {
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [isCreatingShape, setIsCreatingShape] = useState(false);
 
-  const createShape = (shapeData: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const createShape = (shapeData: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'lastEditedBy'>) => {
     const newShape: CanvasObject = {
       ...shapeData,
       id: generateUniqueId(),
       createdAt: new Date(),
       updatedAt: new Date(),
+      version: 1,
+      lastEditedBy: shapeData.createdBy,
     };
     setShapes((prevShapes) => [...prevShapes, newShape]);
     return newShape;
