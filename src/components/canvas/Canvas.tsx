@@ -75,6 +75,9 @@ export const Canvas: React.FC = () => {
   
   // Shape creation state
   const [isCreatingShape, setIsCreatingShape] = useState(false);
+  
+  // Track which shape is currently being dragged
+  const draggingShapeIdRef = useRef<string | null>(null);
 
   // Presence state
   const updateCursorRef = useRef<((x: number, y: number) => void) | null>(null);
@@ -109,8 +112,62 @@ export const Canvas: React.FC = () => {
   }, [canvasId, currentUser]);
 
   // Real-time sync: Subscribe to Firestore changes for this canvas
+  // Smart merge to prevent unnecessary re-renders and flickering
   const handleShapesUpdate = useCallback((syncedShapes: CanvasObject[]) => {
-    setShapes(syncedShapes);
+    setShapes(prevShapes => {
+      // Create a map for efficient lookup
+      const syncedMap = new Map(syncedShapes.map(s => [s.id, s]));
+      
+      // Track if we need to update state
+      let hasChanges = false;
+      
+      // Merge synced shapes with existing shapes
+      const merged = prevShapes.map(prevShape => {
+        const syncedShape = syncedMap.get(prevShape.id);
+        
+        if (!syncedShape) {
+          // Shape was deleted remotely
+          hasChanges = true;
+          return null; // Will be filtered out
+        }
+        
+        // Skip update for shape currently being dragged
+        // This prevents flicker during drag by letting Konva manage the position
+        if (draggingShapeIdRef.current === prevShape.id) {
+          syncedMap.delete(prevShape.id);
+          return prevShape;
+        }
+        
+        // Deep comparison - only update if actually different
+        if (
+          prevShape.x !== syncedShape.x ||
+          prevShape.y !== syncedShape.y ||
+          prevShape.width !== syncedShape.width ||
+          prevShape.height !== syncedShape.height ||
+          prevShape.fill !== syncedShape.fill ||
+          prevShape.version !== syncedShape.version
+        ) {
+          hasChanges = true;
+          syncedMap.delete(prevShape.id);
+          return syncedShape; // Use new reference only if changed
+        }
+        
+        // Shape unchanged - keep same reference to prevent re-render
+        syncedMap.delete(prevShape.id);
+        return prevShape;
+      }).filter((shape): shape is CanvasObject => shape !== null);
+      
+      // Add new shapes that don't exist in prevShapes
+      if (syncedMap.size > 0) {
+        hasChanges = true;
+        syncedMap.forEach(newShape => {
+          merged.push(newShape);
+        });
+      }
+      
+      // Only update state if something actually changed
+      return hasChanges ? merged : prevShapes;
+    });
   }, []);
 
   useRealtimeSync(canvasId, handleShapesUpdate);
@@ -265,31 +322,54 @@ export const Canvas: React.FC = () => {
     setSelectedShapeId(id);
   };
 
+  const handleShapeDragStart = (id: string) => {
+    // Mark shape as being dragged to prevent Firebase updates during drag
+    draggingShapeIdRef.current = id;
+  };
+
   const handleShapeDragEnd = async (id: string, x: number, y: number) => {
     if (!canvasId || !currentUser) return;
 
     // Store original shape for rollback
     const originalShape = shapes.find(shape => shape.id === id);
+    
+    if (!originalShape) {
+      draggingShapeIdRef.current = null;
+      return;
+    }
 
-    // Optimistic update: Update local state immediately with version increment
-    setShapes(
-      shapes.map((shape) =>
+    // Round coordinates to avoid floating point precision issues
+    const roundedX = Math.round(x);
+    const roundedY = Math.round(y);
+
+    // Skip update if position hasn't actually changed
+    if (Math.round(originalShape.x) === roundedX && Math.round(originalShape.y) === roundedY) {
+      draggingShapeIdRef.current = null;
+      return;
+    }
+
+    // Optimistic update: Only update the dragged shape, preserve all other references
+    setShapes(prevShapes =>
+      prevShapes.map((shape) =>
         shape.id === id
           ? { 
               ...shape, 
-              x, 
-              y, 
+              x: roundedX, 
+              y: roundedY, 
               updatedAt: new Date(),
               version: shape.version + 1, // Increment version optimistically
               lastEditedBy: currentUser.id, // Track who edited
             }
-          : shape
+          : shape // Keep same reference for unchanged shapes
       )
     );
 
+    // Clear dragging state to allow Firebase updates again
+    draggingShapeIdRef.current = null;
+
     // Write to Firebase (async, fire and forget)
     try {
-      await updateShapeInFirebase(canvasId, id, { x, y }, currentUser.id);
+      await updateShapeInFirebase(canvasId, id, { x: roundedX, y: roundedY }, currentUser.id);
       // Firestore listener will confirm the update
     } catch (error) {
       console.error('Failed to update shape in Firebase:', error);
@@ -297,13 +377,11 @@ export const Canvas: React.FC = () => {
       showError('Failed to save changes. Please try again.');
       
       // Rollback: Restore original position
-      if (originalShape) {
-        setShapes(
-          shapes.map((shape) =>
-            shape.id === id ? originalShape : shape
-          )
-        );
-      }
+      setShapes(prevShapes =>
+        prevShapes.map((shape) =>
+          shape.id === id ? originalShape : shape
+        )
+      );
     }
   };
 
@@ -473,7 +551,7 @@ export const Canvas: React.FC = () => {
           </Layer>
           
           {/* Main Content Layer */}
-          <Layer>
+          <Layer listening={true} imageSmoothingEnabled={false}>
             {/* Render visible shapes only (viewport virtualization) */}
             {visibleShapes.map((shape) => (
               <Shape
@@ -481,6 +559,7 @@ export const Canvas: React.FC = () => {
                 shape={shape}
                 isSelected={shape.id === selectedShapeId}
                 onSelect={handleSelectShape}
+                onDragStart={handleShapeDragStart}
                 onDragEnd={handleShapeDragEnd}
               />
             ))}
