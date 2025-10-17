@@ -53,3 +53,6 @@ export interface CanvasAccess {
   role: AccessRole;
 }
 
+// Error types
+export { ConflictError } from './errors';
+

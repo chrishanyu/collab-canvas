@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { useToast } from '../../hooks/useToast';
 import { usePersistedViewport } from '../../hooks/usePersistedViewport';
+import { useActiveEdits } from '../../hooks/useActiveEdits';
 import { getCanvasById } from '../../services/canvas.service';
 import { createShape as createShapeInFirebase, updateShape as updateShapeInFirebase } from '../../services/canvasObjects.service';
 import { LoadingSpinner } from '../common/LoadingSpinner';
@@ -15,8 +16,9 @@ import { CanvasToolbar } from './CanvasToolbar';
 import { Shape } from './Shape';
 import { GridDots } from './GridDots';
 import { UserPresence } from '../presence/UserPresence';
-import { constrainZoom, getRelativePointerPosition, generateUniqueId } from '../../utils/canvasHelpers';
+import { constrainZoom, getRelativePointerPosition, generateUniqueId, getUserCursorColor } from '../../utils/canvasHelpers';
 import type { Canvas as CanvasType, CanvasObject } from '../../types';
+import { ConflictError } from '../../types';
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
@@ -48,7 +50,7 @@ const HEADER_HEIGHT = 60;
 export const Canvas: React.FC = () => {
   const { canvasId } = useParams<{ canvasId: string }>();
   const { currentUser } = useAuth();
-  const { showError } = useToast();
+  const { showError, showWarning } = useToast();
   const stageRef = useRef<Konva.Stage>(null);
 
   const [canvas, setCanvas] = useState<CanvasType | null>(null);
@@ -81,6 +83,13 @@ export const Canvas: React.FC = () => {
 
   // Presence state
   const updateCursorRef = useRef<((x: number, y: number) => void) | null>(null);
+
+  // Active edits tracking
+  const {
+    setShapeEditing,
+    clearShapeEditing,
+    getShapeEditor,
+  } = useActiveEdits(canvasId || '', currentUser?.id || '');
 
   // Load canvas metadata
   useEffect(() => {
@@ -325,6 +334,12 @@ export const Canvas: React.FC = () => {
   const handleShapeDragStart = (id: string) => {
     // Mark shape as being dragged to prevent Firebase updates during drag
     draggingShapeIdRef.current = id;
+    
+    // Set active edit indicator so other users see this shape is being edited
+    if (currentUser) {
+      const userColor = getUserCursorColor(currentUser.id, currentUser.id);
+      setShapeEditing(id, currentUser.displayName || 'Unknown', userColor);
+    }
   };
 
   const handleShapeDragEnd = async (id: string, x: number, y: number) => {
@@ -366,14 +381,44 @@ export const Canvas: React.FC = () => {
 
     // Clear dragging state to allow Firebase updates again
     draggingShapeIdRef.current = null;
+    
+    // Clear active edit indicator
+    clearShapeEditing(id);
 
-    // Write to Firebase (async, fire and forget)
+    // Write to Firebase with version checking for conflict detection
     try {
-      await updateShapeInFirebase(canvasId, id, { x: roundedX, y: roundedY }, currentUser.id);
+      await updateShapeInFirebase(
+        canvasId, 
+        id, 
+        { x: roundedX, y: roundedY }, 
+        currentUser.id,
+        originalShape.version // Pass local version for conflict detection
+      );
       // Firestore listener will confirm the update
     } catch (error) {
+      // Handle conflict errors specifically
+      if (error instanceof ConflictError) {
+        console.warn('Conflict detected:', error);
+        
+        // Show user-friendly notification with conflicting user's name
+        const editorName = error.lastEditedByName || 'Another user';
+        showWarning(
+          `Shape was modified by ${editorName}. Reloading latest version...`
+        );
+        
+        // Revert optimistic update - real-time sync will provide latest server version
+        setShapes(prevShapes =>
+          prevShapes.map((shape) =>
+            shape.id === id ? originalShape : shape
+          )
+        );
+        
+        // Note: The Firestore listener will automatically update with the server's version
+        return;
+      }
+      
+      // Handle other errors (network, permissions, etc.)
       console.error('Failed to update shape in Firebase:', error);
-      // Show error notification to user
       showError('Failed to save changes. Please try again.');
       
       // Rollback: Restore original position
@@ -553,16 +598,27 @@ export const Canvas: React.FC = () => {
           {/* Main Content Layer */}
           <Layer listening={true} imageSmoothingEnabled={false}>
             {/* Render visible shapes only (viewport virtualization) */}
-            {visibleShapes.map((shape) => (
-              <Shape
-                key={shape.id}
-                shape={shape}
-                isSelected={shape.id === selectedShapeId}
-                onSelect={handleSelectShape}
-                onDragStart={handleShapeDragStart}
-                onDragEnd={handleShapeDragEnd}
-              />
-            ))}
+            {visibleShapes.map((shape) => {
+              // Get edit indicator info for this shape
+              const editor = getShapeEditor(shape.id);
+              const isBeingEdited = !!editor;
+              const editorName = editor?.userName;
+              const editorColor = editor?.color;
+              
+              return (
+                <Shape
+                  key={shape.id}
+                  shape={shape}
+                  isSelected={shape.id === selectedShapeId}
+                  onSelect={handleSelectShape}
+                  onDragStart={handleShapeDragStart}
+                  onDragEnd={handleShapeDragEnd}
+                  isBeingEdited={isBeingEdited}
+                  editorName={editorName}
+                  editorColor={editorColor}
+                />
+              );
+            })}
           </Layer>
         </Stage>
       </div>

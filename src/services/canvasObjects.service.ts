@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { CanvasObject } from '../types';
+import { ConflictError } from '../types';
 
 /**
  * Canvas Objects Service
@@ -181,28 +182,59 @@ export async function createShape(
 }
 
 /**
- * Updates an existing shape in a canvas
+ * Updates an existing shape in a canvas with optimistic locking
+ * 
+ * This function implements version-based conflict detection. If a localVersion
+ * is provided, it will be checked against the server version before updating.
+ * If the versions don't match, a ConflictError is thrown, indicating that
+ * another user has modified the shape since this user started editing.
+ * 
  * @param canvasId - Canvas ID
  * @param shapeId - Shape ID
  * @param updates - Partial shape data to update
  * @param userId - ID of user making the update (for version tracking)
+ * @param localVersion - Optional version number for conflict detection
+ * @throws {ConflictError} When localVersion doesn't match server version
+ * @throws {Error} When shape is not found or update fails
  */
 export async function updateShape(
   canvasId: string,
   shapeId: string,
   updates: Partial<Omit<CanvasObject, 'id' | 'createdAt' | 'createdBy' | 'version' | 'lastEditedBy'>>,
-  userId?: string
+  userId?: string,
+  localVersion?: number
 ): Promise<void> {
   try {
     const shapeRef = getObjectDoc(canvasId, shapeId);
     
-    // Check if shape exists
+    // Fetch current shape for existence check and version validation
     const shapeSnap = await getDoc(shapeRef);
     if (!shapeSnap.exists()) {
       throw new Error(`Shape ${shapeId} not found in canvas ${canvasId}`);
     }
     
-    // Update with server timestamp, increment version, and track editor
+    const shapeData = shapeSnap.data();
+    
+    // Version-based conflict detection (optimistic locking)
+    if (localVersion !== undefined) {
+      const serverVersion = shapeData.version || 1; // Default to 1 for backward compatibility
+      
+      if (localVersion !== serverVersion) {
+        // Conflict detected! Another user modified this shape
+        const lastEditedBy = shapeData.lastEditedBy || 'unknown';
+        const lastEditedByName = shapeData.lastEditedByName; // Optional field
+        
+        throw new ConflictError(
+          shapeId,
+          localVersion,
+          serverVersion,
+          lastEditedBy,
+          lastEditedByName
+        );
+      }
+    }
+    
+    // No conflict - proceed with update
     const updateData: Record<string, unknown> = {
       ...updates,
       updatedAt: serverTimestamp(),
@@ -217,10 +249,17 @@ export async function updateShape(
     await updateDoc(shapeRef, updateData);
   } catch (error) {
     console.error('Error updating shape:', error);
+    
+    // Rethrow ConflictError as-is (don't wrap it)
+    if (error instanceof ConflictError) {
+      throw error;
+    }
+    
     // Rethrow specific errors (like "not found")
     if (error instanceof Error && error.message.includes('not found')) {
       throw error;
     }
+    
     throw new Error('Failed to update shape');
   }
 }

@@ -9,6 +9,9 @@ interface ShapeProps {
   onSelect: (id: string) => void;
   onDragStart: (id: string) => void;
   onDragEnd: (id: string, x: number, y: number) => void;
+  isBeingEdited?: boolean;
+  editorName?: string;
+  editorColor?: string;
 }
 
 /**
@@ -21,7 +24,16 @@ interface ShapeProps {
  * This prevents unnecessary re-renders when other shapes change,
  * dramatically improving performance with many shapes (500+)
  */
-export const Shape = React.memo(({ shape, isSelected, onSelect, onDragStart, onDragEnd }: ShapeProps) => {
+export const Shape = React.memo(({ 
+  shape, 
+  isSelected, 
+  onSelect, 
+  onDragStart, 
+  onDragEnd,
+  isBeingEdited = false,
+  editorName,
+  editorColor,
+}: ShapeProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleDragStart = () => {
@@ -36,6 +48,33 @@ export const Shape = React.memo(({ shape, isSelected, onSelect, onDragStart, onD
   const handleClick = () => {
     onSelect(shape.id);
   };
+
+  // Determine stroke styling based on state priority
+  // Priority: Selected > Being Edited > Hovered
+  let stroke: string | undefined;
+  let strokeWidth: number;
+  let dash: number[] | undefined;
+  
+  if (isSelected) {
+    // Selected: Solid green border
+    stroke = '#10B981';
+    strokeWidth = 3;
+    dash = undefined;
+  } else if (isBeingEdited && editorColor) {
+    // Being edited: Pulsing border with editor's color
+    stroke = editorColor;
+    strokeWidth = 2;
+    dash = [8, 4]; // Dashed border for edit indicator
+  } else if (isHovered) {
+    // Hovered: Gray border
+    stroke = '#6B7280';
+    strokeWidth = 2;
+    dash = undefined;
+  } else {
+    stroke = undefined;
+    strokeWidth = 0;
+    dash = undefined;
+  }
 
   // Render rectangle shape
   if (shape.type === 'rectangle') {
@@ -52,9 +91,12 @@ export const Shape = React.memo(({ shape, isSelected, onSelect, onDragStart, onD
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         // Visual feedback
-        stroke={isSelected ? '#10B981' : isHovered ? '#6B7280' : undefined}
-        strokeWidth={isSelected ? 3 : isHovered ? 2 : 0}
-        opacity={isHovered && !isSelected ? 0.8 : 1}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        dash={dash}
+        opacity={isHovered && !isSelected && !isBeingEdited ? 0.8 : 1}
+        // Add name for accessibility/debugging and potential tooltip
+        name={isBeingEdited && editorName ? `editing-by-${editorName}` : undefined}
         // Performance optimization
         perfectDrawEnabled={false}
         // Cursor feedback
@@ -62,6 +104,10 @@ export const Shape = React.memo(({ shape, isSelected, onSelect, onDragStart, onD
           const container = e.target.getStage()?.container();
           if (container) {
             container.style.cursor = 'move';
+            // Show tooltip for editing indicator
+            if (isBeingEdited && editorName) {
+              container.title = `${editorName} is editing this shape`;
+            }
           }
           setIsHovered(true);
         }}
@@ -69,6 +115,7 @@ export const Shape = React.memo(({ shape, isSelected, onSelect, onDragStart, onD
           const container = e.target.getStage()?.container();
           if (container) {
             container.style.cursor = 'default';
+            container.title = '';
           }
           setIsHovered(false);
         }}
@@ -94,7 +141,12 @@ export const Shape = React.memo(({ shape, isSelected, onSelect, onDragStart, onD
   
   const selectionEqual = prevProps.isSelected === nextProps.isSelected;
   
+  const editIndicatorEqual = 
+    prevProps.isBeingEdited === nextProps.isBeingEdited &&
+    prevProps.editorName === nextProps.editorName &&
+    prevProps.editorColor === nextProps.editorColor;
+  
   // Return true if nothing changed (prevents re-render)
-  return shapeEqual && selectionEqual;
+  return shapeEqual && selectionEqual && editIndicatorEqual;
 });
 

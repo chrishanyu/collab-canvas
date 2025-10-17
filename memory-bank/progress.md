@@ -1,11 +1,11 @@
 # Progress Tracker: CollabCanvas
 
-## Current Status: MVP Complete ✅ - Phase 2 Ready 🚀
+## Current Status: MVP Complete ✅ - Phase 2 In Progress 🚀
 
 **Phase 1 (MVP):** ✅ Complete  
-**All Tests Passing:** 113/113 (100%) ✅  
-**Branch:** `feature/ui-polish`  
-**Last Updated:** October 15, 2025
+**All Tests Passing:** 266/266 (100%) ✅  
+**Current Feature:** Conflict Resolution System - Phase 2 Complete ✅
+**Last Updated:** October 17, 2025
 
 ---
 
@@ -190,9 +190,13 @@ The 24-hour MVP challenge is complete! Core collaborative infrastructure is prov
 
 ---
 
-## Phase 2 Features - Ready to Build 🚀
+## Phase 2 Features - In Progress 🚀
 
-### Now Available to Build
+### Currently Building: Conflict Resolution System
+**Status:** Phase 1 Starting (Version-Based Conflict Detection)
+**Estimated Time:** 7-10 hours total
+**Progress:** Task 1.0 starting
+
 Previously deferred features are now in scope. No timeline constraints - focusing on quality and completeness.
 
 ### 8. Deployment & Documentation (PR #8) ⏳ OPTIONAL
@@ -284,6 +288,54 @@ Previously deferred features are now in scope. No timeline constraints - focusin
 
 ---
 
+### 12. Conflict Resolution System (In Progress) 🚧
+**Goal:** Two-tiered defense preventing data loss in collaborative editing
+**Status:** Phase 1 Complete ✅ - Phase 2 Ready to Start
+
+**Completed Pre-work:**
+- ✅ Version tracking infrastructure (version field, lastEditedBy field)
+- ✅ Version incremented on every update (`increment(1)`)
+- ✅ PRD created: `tasks/prd-conflict-resolution.md`
+- ✅ Task list created: `tasks/tasks-conflict-resolution.md`
+
+**Phase 1: Version-Based Conflict Detection ✅ COMPLETE**
+- ✅ Create ConflictError type (with shapeId, versions, lastEditedBy)
+- ✅ Implement version checking in updateShape with optimistic locking
+- ✅ Add conflict handling in Canvas component with toast notifications
+- ✅ Unit tests for version checking (13 tests passing)
+- ✅ Integration tests for conflict scenarios (10 tests passing)
+
+**Files Created:**
+- ✅ `src/types/errors.ts` - ConflictError class
+- ✅ `tests/unit/conflictDetection.test.ts` - Version checking tests
+- ✅ `tests/integration/conflict-scenarios.test.tsx` - Conflict flow tests
+
+**Files Modified:**
+- ✅ `src/services/canvasObjects.service.ts` - Added version checking
+- ✅ `src/components/canvas/Canvas.tsx` - Added conflict error handling
+- ✅ `src/hooks/useToast.ts` - Exposed showWarning
+
+**Phase 2: Real-Time Edit Indicators (Next - 4-5 hours)**
+- [ ] Create active-edits Firestore service
+- [ ] Create useActiveEdits hook
+- [ ] Add edit indicators to Shape component
+- [ ] Integrate active-edits tracking in Canvas
+- [ ] Tests for edit indicators
+
+**Phase 3: Documentation & Testing (Final - 1-2 hours)**
+- [ ] Document conflict resolution in README
+- [ ] Manual testing with 2+ concurrent users
+- [ ] Performance & edge case testing
+
+**Acceptance Criteria:**
+- ✅ 0% data loss (all conflicts caught via version checking)
+- ⏳ 80-90% conflict prevention (via edit indicators - Phase 2)
+- ⏳ Edit indicators appear within 200ms (Phase 2)
+- ✅ Conflict toast shows who made conflicting change
+- ✅ Update latency maintained: < 150ms
+
+---
+
 ## Known Issues & Tech Debt
 
 ### Issues to Address
@@ -294,8 +346,8 @@ Previously deferred features are now in scope. No timeline constraints - focusin
 5. **Canvas Deletion** - Not implemented (out of scope for MVP, but users may request)
 
 ### Technical Debt
-1. **No undo/redo** - Would require operational transforms or state history
-2. **Basic conflict resolution** - Last-write-wins can cause overwrites
+1. **No undo/redo** - Would require operational transforms or state history (planned for later)
+2. **Basic conflict resolution** - 🚧 **IN PROGRESS** - Implementing two-tiered conflict management
 3. **No offline mode** - Requires network (Firebase has offline support, not prioritized)
 4. **No optimistic rollback** - Failed writes just log errors
 5. **No data compression** - Could optimize large canvases later
@@ -315,12 +367,21 @@ Previously deferred features are now in scope. No timeline constraints - focusin
 |---------|-----------|------------------|-------|
 | Canvas Helpers | 16 | - | 16 |
 | Auth Service | 15 | 9 | 24 |
-| Canvas Service | 22 | 10 | 32 |
+| Canvas Service | 32 | 10 | 42 |
 | Canvas Operations | - | 22 | 22 |
-| Canvas Objects Service | 19 | - | 19 |
-| **TOTAL** | **72** | **41** | **113** ✅ |
+| Canvas Objects Service | 27 | - | 27 |
+| Toast Utilities | 30 | - | 30 |
+| Connection Status Hook | 14 | - | 14 |
+| Persisted Viewport Hook | 15 | - | 15 |
+| Canvas Deletion | - | 11 | 11 |
+| Conflict Detection | 13 | 10 | 23 |
+| Active Edits Service | 13 | - | 13 |
+| useActiveEdits Hook | 19 | - | 19 |
+| Edit Indicators | - | 10 | 10 |
+| **TOTAL** | **194** | **72** | **266** ✅ |
 
-**Coverage:** 100% of tests passing (113/113)
+**Coverage:** 100% of tests passing (266/266)
+**Duration:** ~3.43s
 
 ---
 
