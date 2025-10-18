@@ -121,10 +121,10 @@ export const usePresence = (
         setUserOffline(canvasId, userId).catch((error) => {
           console.error('Failed to set user offline:', error);
         });
-      isOnlineRef.current = false;
-    }
-  };
-}, [canvasId, userId, displayName]);
+        isOnlineRef.current = false;
+      }
+    };
+  }, [canvasId, userId, displayName]);
 
   /**
    * Handle browser close/tab close - set user offline
