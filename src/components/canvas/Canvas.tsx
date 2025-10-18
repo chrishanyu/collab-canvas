@@ -8,28 +8,26 @@ import { useToast } from '../../hooks/useToast';
 import { usePersistedViewport } from '../../hooks/usePersistedViewport';
 import { useActiveEdits } from '../../hooks/useActiveEdits';
 import { getCanvasById } from '../../services/canvas.service';
-import { createShape as createShapeInFirebase, updateShape as updateShapeInFirebase } from '../../services/canvasObjects.service';
+import { createShape as createShapeInFirebase, updateShape as updateShapeInFirebase, deleteShape as deleteShapeInFirebase } from '../../services/canvasObjects.service';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { ConnectionIndicator } from '../common/ConnectionIndicator';
+import { CanvasHeader } from './CanvasHeader';
 import { CanvasToolbar } from './CanvasToolbar';
+import { ShapesPanel } from './ShapesPanel';
+import { ZoomControls } from './ZoomControls';
+import { ShareLinkModal } from '../dashboard/ShareLinkModal';
 import { Shape } from './Shape';
+import { PreviewShape } from './PreviewShape';
 import { GridDots } from './GridDots';
 import { UserPresence } from '../presence/UserPresence';
 import { constrainZoom, getRelativePointerPosition, generateUniqueId, getUserCursorColor } from '../../utils/canvasHelpers';
-import type { Canvas as CanvasType, CanvasObject } from '../../types';
+import type { Canvas as CanvasType, CanvasObject, ShapeType } from '../../types';
 import { ConflictError } from '../../types';
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
-  DEFAULT_ZOOM,
-  DEFAULT_CANVAS_X,
-  DEFAULT_CANVAS_Y,
-  ZOOM_SPEED,
 } from '../../utils/constants';
-
-// Canvas UI constants
-const HEADER_HEIGHT = 60;
 
 /**
  * Canvas Component (Performance Optimized)
@@ -76,7 +74,16 @@ export const Canvas: React.FC = () => {
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   
   // Shape creation state
-  const [isCreatingShape, setIsCreatingShape] = useState(false);
+  const [creatingShapeType, setCreatingShapeType] = useState<string | null>(null);
+  
+  // Shapes panel state
+  const [isShapesPanelOpen, setIsShapesPanelOpen] = useState(false);
+  
+  // Preview shape state (for ghost shape following cursor)
+  const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null);
+  
+  // Share modal state
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   
   // Track which shape is currently being dragged
   const draggingShapeIdRef = useRef<string | null>(null);
@@ -119,6 +126,73 @@ export const Canvas: React.FC = () => {
 
     loadCanvas();
   }, [canvasId, currentUser]);
+
+  // Update browser tab title with canvas name
+  useEffect(() => {
+    if (canvas?.name) {
+      document.title = `${canvas.name} - CollabCanvas`;
+    }
+    
+    // Cleanup: reset to default title on unmount
+    return () => {
+      document.title = 'CollabCanvas';
+    };
+  }, [canvas?.name]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // ESC key: Cancel shape creation, close panel, or deselect shape
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        
+        // Priority: Cancel shape creation first
+        if (creatingShapeType) {
+          setCreatingShapeType(null);
+          setPreviewPosition(null);
+          return;
+        }
+        
+        // Then close shapes panel
+        if (isShapesPanelOpen) {
+          setIsShapesPanelOpen(false);
+          return;
+        }
+        
+        // Finally deselect shape
+        if (selectedShapeId) {
+          setSelectedShapeId(null);
+          return;
+        }
+      }
+      
+      // Delete/Backspace key: Delete selected shape
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShapeId) {
+        // Prevent backspace from navigating back in browser
+        e.preventDefault();
+        
+        // Delete the selected shape
+        if (canvasId) {
+          deleteShapeInFirebase(canvasId, selectedShapeId)
+            .then(() => {
+              // Optimistically remove from local state
+              setShapes(prevShapes => prevShapes.filter(s => s.id !== selectedShapeId));
+              setSelectedShapeId(null);
+            })
+            .catch((error) => {
+              console.error('Failed to delete shape:', error);
+              showError('Failed to delete shape. Please try again.');
+            });
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [creatingShapeType, isShapesPanelOpen, selectedShapeId, canvasId, showError]);
 
   // Real-time sync: Subscribe to Firestore changes for this canvas
   // Smart merge to prevent unnecessary re-renders and flickering
@@ -222,9 +296,9 @@ export const Canvas: React.FC = () => {
       y: (pointer.y - stage.y()) / oldScale,
     };
 
-    // Determine zoom direction
+    // Determine zoom direction (smooth, continuous zoom)
     const direction = e.evt.deltaY > 0 ? -1 : 1;
-    const newScale = constrainZoom(oldScale + direction * ZOOM_SPEED);
+    const newScale = constrainZoom(oldScale + direction * 0.05);
 
     // Update scale
     setStageScale(newScale);
@@ -239,36 +313,53 @@ export const Canvas: React.FC = () => {
     setStageY(newPos.y);
   };
 
-  // Reset view to default
-  const handleResetView = () => {
-    setStageScale(DEFAULT_ZOOM);
-    setStageX(DEFAULT_CANVAS_X);
-    setStageY(DEFAULT_CANVAS_Y);
-  };
-
-  // Zoom in
+  // Zoom in by 25%
   const handleZoomIn = () => {
-    const newScale = constrainZoom(stageScale + ZOOM_SPEED);
+    const newScale = constrainZoom(stageScale + 0.25);
     setStageScale(newScale);
   };
 
-  // Zoom out
+  // Zoom out by 25%
   const handleZoomOut = () => {
-    const newScale = constrainZoom(stageScale - ZOOM_SPEED);
+    const newScale = constrainZoom(stageScale - 0.25);
     setStageScale(newScale);
   };
 
-  // Shape creation handlers
-  const handleAddRectangle = () => {
-    setIsCreatingShape(true);
+  // Shapes panel handlers
+  const handleToggleShapesPanel = () => {
+    setIsShapesPanelOpen(!isShapesPanelOpen);
+  };
+
+  const handleSelectShape = (shapeType: string) => {
+    setCreatingShapeType(shapeType);
     setSelectedShapeId(null); // Deselect any selected shape
+  };
+
+  const handleCloseShapesPanel = () => {
+    setIsShapesPanelOpen(false);
+  };
+
+  // Handle mouse move on stage for preview shape
+  const handleStageMouseMove = () => {
+    if (!creatingShapeType) {
+      setPreviewPosition(null);
+      return;
+    }
+    
+    const stage = stageRef.current;
+    if (!stage) return;
+    
+    const pos = getRelativePointerPosition(stage);
+    if (pos) {
+      setPreviewPosition(pos);
+    }
   };
 
   const handleStageMouseDown = async (e: Konva.KonvaEventObject<MouseEvent>) => {
     // Click on empty space deselects shapes (if not in creation mode)
     const clickedOnEmpty = e.target === e.target.getStage();
     
-    if (!isCreatingShape) {
+    if (!creatingShapeType) {
       if (clickedOnEmpty) {
         setSelectedShapeId(null);
       }
@@ -285,15 +376,16 @@ export const Canvas: React.FC = () => {
     if (!pos) return;
 
     // Exit creation mode immediately to prevent rapid clicking
-    setIsCreatingShape(false);
+    setCreatingShapeType(null);
+    setPreviewPosition(null);
 
     // Default shape size
     const DEFAULT_SHAPE_WIDTH = 100;
     const DEFAULT_SHAPE_HEIGHT = 100;
 
-    // Create shape centered at click position
+    // Create shape centered at click position based on type
     const shapeData = {
-      type: 'rectangle' as const,
+      type: creatingShapeType as ShapeType,
       x: pos.x - DEFAULT_SHAPE_WIDTH / 2,
       y: pos.y - DEFAULT_SHAPE_HEIGHT / 2,
       width: DEFAULT_SHAPE_WIDTH,
@@ -327,7 +419,7 @@ export const Canvas: React.FC = () => {
   };
 
   // Shape interaction handlers
-  const handleSelectShape = (id: string) => {
+  const handleSelectShapeId = (id: string) => {
     setSelectedShapeId(id);
   };
 
@@ -436,7 +528,7 @@ export const Canvas: React.FC = () => {
       // Convert viewport coordinates to canvas coordinates
       // This ensures cursors appear in the same position regardless of zoom/pan
       const canvasX = (e.clientX - stageX) / stageScale;
-      const canvasY = (e.clientY - HEADER_HEIGHT - stageY) / stageScale;
+      const canvasY = (e.clientY - stageY) / stageScale;
       updateCursorRef.current(canvasX, canvasY);
     }
   };
@@ -445,9 +537,6 @@ export const Canvas: React.FC = () => {
   const handleCursorMove = useCallback((updateCursor: (x: number, y: number) => void) => {
     updateCursorRef.current = updateCursor;
   }, []);
-
-  // Calculate actual stage height (used in multiple places)
-  const actualStageHeight = stageHeight - HEADER_HEIGHT;
 
   // Viewport virtualization: Only render shapes visible in current viewport
   // This is critical for performance with 500+ shapes
@@ -461,7 +550,7 @@ export const Canvas: React.FC = () => {
     const viewportLeft = -stageX / stageScale;
     const viewportTop = -stageY / stageScale;
     const viewportRight = viewportLeft + stageWidth / stageScale;
-    const viewportBottom = viewportTop + actualStageHeight / stageScale;
+    const viewportBottom = viewportTop + stageHeight / stageScale;
 
     // Add padding to viewport for smooth scrolling (render shapes slightly outside viewport)
     const padding = 200; // 200px padding on all sides
@@ -497,7 +586,7 @@ export const Canvas: React.FC = () => {
     }
 
     return visible;
-  }, [shapes, stageScale, stageX, stageY, stageWidth, actualStageHeight, selectedShapeId]);
+  }, [shapes, stageScale, stageX, stageY, stageWidth, stageHeight, selectedShapeId]);
 
   if (loading) {
     return (
@@ -527,66 +616,61 @@ export const Canvas: React.FC = () => {
 
   return (
     <div 
-      className="relative w-full h-screen overflow-hidden bg-gray-200"
+      className="relative w-full h-screen overflow-hidden bg-gray-100"
       onMouseMove={handleMouseMove}
     >
       {/* Connection Status Indicator */}
       <ConnectionIndicator />
 
-      {/* Canvas Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-white shadow-sm px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <a
-            href="/dashboard"
-            className="text-sm text-gray-600 hover:text-gray-900"
-          >
-            ← Dashboard
-          </a>
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">{canvas.name}</h1>
-            <p className="text-xs text-gray-500">
-              by {canvas.ownerName} • Last updated: {canvas.updatedAt.toLocaleDateString()}
-            </p>
-          </div>
-        </div>
-        <div className="text-xs text-gray-400">
-          Canvas ID: {canvasId}
-        </div>
-      </div>
+      {/* Floating Canvas Header */}
+        <CanvasHeader 
+          canvasName={canvas.name} 
+          onShare={() => setIsShareModalOpen(true)}
+        />
 
       {/* Canvas Toolbar */}
       <CanvasToolbar
-        onResetView={handleResetView}
+        onToggleShapes={handleToggleShapesPanel}
+      />
+
+      {/* Shapes Panel */}
+      <ShapesPanel
+        isOpen={isShapesPanelOpen}
+        selectedShape={creatingShapeType}
+        onSelectShape={handleSelectShape}
+        onClose={handleCloseShapesPanel}
+      />
+
+      {/* Zoom Controls */}
+      <ZoomControls
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
-        currentZoom={stageScale}
-        onAddRectangle={handleAddRectangle}
-        isCreatingShape={isCreatingShape}
       />
 
       {/* Konva Stage */}
       <div 
-        className="pt-[60px] w-full h-full bg-gray-100"
-        style={{ cursor: isCreatingShape ? 'crosshair' : 'default' }}
+        className="w-full h-full"
+        style={{ cursor: creatingShapeType ? 'crosshair' : 'default' }}
       >
         <Stage
           ref={stageRef}
           width={stageWidth}
-          height={actualStageHeight}
+          height={stageHeight}
           scaleX={stageScale}
           scaleY={stageScale}
           x={stageX}
           y={stageY}
-          draggable={!isCreatingShape} // Disable pan while creating shapes
+          draggable={!creatingShapeType} // Disable pan while creating shapes
           onDragEnd={handleDragEnd}
           onWheel={handleWheel}
+          onMouseMove={handleStageMouseMove}
           onMouseDown={handleStageMouseDown}
         >
           {/* Background Grid Layer - scales with zoom */}
           <Layer listening={false}>
             <GridDots
               width={stageWidth}
-              height={actualStageHeight}
+              height={stageHeight}
               stageScale={stageScale}
               stageX={stageX}
               stageY={stageY}
@@ -610,7 +694,7 @@ export const Canvas: React.FC = () => {
                   key={shape.id}
                   shape={shape}
                   isSelected={shape.id === selectedShapeId}
-                  onSelect={handleSelectShape}
+                  onSelect={handleSelectShapeId}
                   onDragStart={handleShapeDragStart}
                   onDragEnd={handleShapeDragEnd}
                   isBeingEdited={isBeingEdited}
@@ -619,24 +703,17 @@ export const Canvas: React.FC = () => {
                 />
               );
             })}
+            
+            {/* Preview/Ghost shape during creation */}
+            {creatingShapeType && previewPosition && (
+              <PreviewShape
+                shapeType={creatingShapeType as ShapeType}
+                x={previewPosition.x}
+                y={previewPosition.y}
+              />
+            )}
           </Layer>
         </Stage>
-      </div>
-
-      {/* Canvas Info (dev only - can be removed later) */}
-      <div className="absolute bottom-4 left-4 bg-white/90 rounded-lg shadow-lg px-4 py-2 text-xs text-gray-600">
-        <div>Canvas: {CANVAS_WIDTH} × {CANVAS_HEIGHT}px</div>
-        <div>Viewport: {stageWidth} × {actualStageHeight}px</div>
-        <div>Scale: {stageScale.toFixed(2)}x</div>
-        <div>Position: ({Math.round(stageX)}, {Math.round(stageY)})</div>
-        <div className="mt-1 pt-1 border-t border-gray-300">
-          <span className="font-semibold">Shapes:</span> {visibleShapes.length} / {shapes.length} rendered
-          {shapes.length > 0 && (
-            <span className="text-green-600 ml-1">
-              ({Math.round((visibleShapes.length / shapes.length) * 100)}%)
-            </span>
-          )}
-        </div>
       </div>
 
       {/* User Presence - Cursors and Online Users */}
@@ -648,7 +725,15 @@ export const Canvas: React.FC = () => {
         stageX={stageX}
         stageY={stageY}
         stageScale={stageScale}
-        headerHeight={HEADER_HEIGHT}
+        headerHeight={0}
+      />
+
+      {/* Share Modal */}
+      <ShareLinkModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        shareLink={`${window.location.origin}/canvas/${canvasId}`}
+        canvasName={canvas.name}
       />
     </div>
   );

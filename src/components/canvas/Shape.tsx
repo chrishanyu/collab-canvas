@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Rect } from 'react-konva';
+import { Rect, Circle, Ellipse, Star, RegularPolygon } from 'react-konva';
 import type { CanvasObject } from '../../types';
 import Konva from 'konva';
 
@@ -42,7 +42,17 @@ export const Shape = React.memo(({
 
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target;
-    onDragEnd(shape.id, node.x(), node.y());
+    let finalX = node.x();
+    let finalY = node.y();
+    
+    // For center-based shapes, convert center position back to top-left equivalent
+    // This ensures consistent storage format in the database
+    if (shape.type !== 'rectangle') {
+      finalX = node.x() - shape.width / 2;
+      finalY = node.y() - shape.height / 2;
+    }
+    
+    onDragEnd(shape.id, finalX, finalY);
   };
 
   const handleClick = () => {
@@ -76,55 +86,116 @@ export const Shape = React.memo(({
     dash = undefined;
   }
 
-  // Render rectangle shape
-  if (shape.type === 'rectangle') {
-    return (
-      <Rect
-        x={shape.x}
-        y={shape.y}
-        width={shape.width}
-        height={shape.height}
-        fill={shape.fill}
-        draggable
-        onClick={handleClick}
-        onTap={handleClick}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        // Visual feedback
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-        dash={dash}
-        opacity={isHovered && !isSelected && !isBeingEdited ? 0.8 : 1}
-        // Add name for accessibility/debugging and potential tooltip
-        name={isBeingEdited && editorName ? `editing-by-${editorName}` : undefined}
-        // Performance optimization
-        perfectDrawEnabled={false}
-        // Cursor feedback
-        onMouseEnter={(e) => {
-          const container = e.target.getStage()?.container();
-          if (container) {
-            container.style.cursor = 'move';
-            // Show tooltip for editing indicator
-            if (isBeingEdited && editorName) {
-              container.title = `${editorName} is editing this shape`;
-            }
-          }
-          setIsHovered(true);
-        }}
-        onMouseLeave={(e) => {
-          const container = e.target.getStage()?.container();
-          if (container) {
-            container.style.cursor = 'default';
-            container.title = '';
-          }
-          setIsHovered(false);
-        }}
-      />
-    );
-  }
+  // Common props for all shapes
+  const commonProps = {
+    fill: shape.fill,
+    draggable: true,
+    onClick: handleClick,
+    onTap: handleClick,
+    onDragStart: handleDragStart,
+    onDragEnd: handleDragEnd,
+    stroke,
+    strokeWidth,
+    dash,
+    opacity: isHovered && !isSelected && !isBeingEdited ? 0.8 : 1,
+    name: isBeingEdited && editorName ? `editing-by-${editorName}` : undefined,
+    perfectDrawEnabled: false,
+    onMouseEnter: (e: Konva.KonvaEventObject<MouseEvent>) => {
+      const container = e.target.getStage()?.container();
+      if (container) {
+        container.style.cursor = 'move';
+        if (isBeingEdited && editorName) {
+          container.title = `${editorName} is editing this shape`;
+        }
+      }
+      setIsHovered(true);
+    },
+    onMouseLeave: (e: Konva.KonvaEventObject<MouseEvent>) => {
+      const container = e.target.getStage()?.container();
+      if (container) {
+        container.style.cursor = 'default';
+        container.title = '';
+      }
+      setIsHovered(false);
+    },
+  };
 
-  // Placeholder for other shape types (circle, text) - to be implemented later
-  return null;
+  // Render based on shape type
+  switch (shape.type) {
+    case 'rectangle':
+      return (
+        <Rect
+          x={shape.x}
+          y={shape.y}
+          width={shape.width}
+          height={shape.height}
+          {...commonProps}
+        />
+      );
+
+    case 'circle':
+      // Circle uses center point (x, y) and radius
+      return (
+        <Circle
+          x={shape.x + shape.width / 2}
+          y={shape.y + shape.height / 2}
+          radius={shape.width / 2}
+          {...commonProps}
+        />
+      );
+
+    case 'ellipse':
+      // Ellipse uses center point and separate radiuses for X and Y
+      return (
+        <Ellipse
+          x={shape.x + shape.width / 2}
+          y={shape.y + shape.height / 2}
+          radiusX={shape.width / 2}
+          radiusY={shape.height / 2}
+          {...commonProps}
+        />
+      );
+
+    case 'star':
+      // Star uses center point, outer radius, inner radius, and number of points
+      return (
+        <Star
+          x={shape.x + shape.width / 2}
+          y={shape.y + shape.height / 2}
+          numPoints={5}
+          innerRadius={shape.width / 4}
+          outerRadius={shape.width / 2}
+          {...commonProps}
+        />
+      );
+
+    case 'pentagon':
+      // Pentagon is a regular polygon with 5 sides
+      return (
+        <RegularPolygon
+          x={shape.x + shape.width / 2}
+          y={shape.y + shape.height / 2}
+          sides={5}
+          radius={shape.width / 2}
+          {...commonProps}
+        />
+      );
+
+    case 'octagon':
+      // Octagon is a regular polygon with 8 sides
+      return (
+        <RegularPolygon
+          x={shape.x + shape.width / 2}
+          y={shape.y + shape.height / 2}
+          sides={8}
+          radius={shape.width / 2}
+          {...commonProps}
+        />
+      );
+
+    default:
+      return null;
+  }
 }, (prevProps, nextProps) => {
   // Custom comparison function for React.memo
   // Returns true if props are equal (skip re-render)
