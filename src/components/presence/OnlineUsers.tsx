@@ -22,7 +22,7 @@ export const OnlineUsers: React.FC<OnlineUsersProps> = ({ users, currentUserId }
   }
 
   return (
-    <div className="absolute top-20 right-4 z-20 bg-white rounded-lg shadow-lg px-3 py-2 min-w-[160px]">
+    <div className="absolute top-4 right-4 z-20 bg-white rounded-lg shadow-lg px-3 py-2 min-w-[160px]">
       <div className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-2">
         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
         Online ({users.length})

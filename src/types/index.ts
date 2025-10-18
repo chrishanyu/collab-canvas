@@ -18,7 +18,7 @@ export interface Canvas {
 }
 
 // Canvas object types
-export type ShapeType = 'rectangle' | 'circle' | 'text';
+export type ShapeType = 'rectangle' | 'circle' | 'text' | 'ellipse' | 'star' | 'pentagon' | 'octagon';
 
 export interface CanvasObject {
   id: string;
