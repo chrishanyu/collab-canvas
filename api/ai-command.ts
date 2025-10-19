@@ -1,69 +1,20 @@
 /**
  * Vercel Serverless Function: AI Command Processing
  * 
- * This function:
+ * Main API endpoint that:
  * 1. Verifies Firebase authentication
- * 2. Calls OpenAI GPT-4 Turbo with function calling
- * 3. Returns function calls to be executed on the frontend
+ * 2. Checks rate limits
+ * 3. Calls OpenAI GPT-4 Turbo with function calling
+ * 4. Returns function calls to be executed on the frontend
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import OpenAI from 'openai';
-import { SYSTEM_PROMPT, FUNCTION_SCHEMAS } from '../src/utils/aiPrompts';
-
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// Rate limiting: Simple in-memory store (consider Redis for production)
-const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 10; // requests per minute
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute in ms
-
-/**
- * Check rate limit for a user
- */
-function checkRateLimit(userId: string): boolean {
-  const now = Date.now();
-  const userLimit = rateLimitStore.get(userId);
-
-  if (!userLimit || now > userLimit.resetAt) {
-    // Reset rate limit
-    rateLimitStore.set(userId, {
-      count: 1,
-      resetAt: now + RATE_LIMIT_WINDOW,
-    });
-    return true;
-  }
-
-  if (userLimit.count >= RATE_LIMIT) {
-    return false;
-  }
-
-  userLimit.count++;
-  return true;
-}
-
-/**
- * Verify Firebase Auth token
- * For MVP: Basic validation of token presence
- * For production: Use Firebase Admin SDK to verify token
- */
-async function verifyAuthToken(authHeader: string | undefined): Promise<{ valid: boolean; userId?: string }> {
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { valid: false };
-  }
-
-  // TODO: In production, verify token with Firebase Admin SDK
-  // const token = authHeader.substring(7);
-  // const admin = require('firebase-admin');
-  // const decodedToken = await admin.auth().verifyIdToken(token);
-  // return { valid: true, userId: decodedToken.uid };
-
-  // For MVP: Accept any Bearer token and extract userId from request body
-  return { valid: true, userId: 'temp' };
-}
+import { openai, AI_CONFIG } from './lib/openai';
+import { SYSTEM_PROMPT } from './lib/prompts';
+import { TOOLS } from './lib/schemas';
+import { verifyAuthToken } from './lib/auth';
+import { checkRateLimit } from './lib/rateLimit';
 
 /**
  * Main handler
@@ -80,10 +31,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 1. Verify authentication
     const authResult = await verifyAuthToken(req.headers.authorization);
     if (!authResult.valid) {
-      return res.status(401).json({ error: 'Unauthorized: Invalid or missing authentication token' });
+      return res.status(401).json({ 
+        error: 'Unauthorized: Invalid or missing authentication token' 
+      });
     }
 
-    // 2. Parse request body
+    // 2. Parse and validate request body
     const { command, canvasId, userId, canvasState } = req.body;
 
     if (!command || typeof command !== 'string') {
@@ -106,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // 4. Call OpenAI with function calling
+    // 4. Build messages for OpenAI
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: command },
@@ -120,13 +73,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // 5. Call OpenAI (Modern Tools API)
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: AI_CONFIG.model,
       messages,
-      functions: FUNCTION_SCHEMAS,
-      function_call: 'auto',
-      temperature: 0.3, // Lower temperature for more consistent results
-      max_tokens: 500,
+      tools: TOOLS,
+      tool_choice: 'auto',
+      temperature: AI_CONFIG.temperature,
+      max_tokens: AI_CONFIG.maxTokens,
     });
 
     const responseMessage = completion.choices[0]?.message;
@@ -135,19 +89,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'No response from AI' });
     }
 
-    // 5. Parse function calls
+    // 6. Parse tool calls (supports multiple calls in one response!)
     const functionCalls: Array<{ name: string; arguments: Record<string, unknown> }> = [];
 
-    if (responseMessage.function_call) {
-      try {
-        const args = JSON.parse(responseMessage.function_call.arguments);
-        functionCalls.push({
-          name: responseMessage.function_call.name,
-          arguments: args,
-        });
-      } catch (parseError) {
-        console.error('Error parsing function arguments:', parseError);
-        return res.status(500).json({ error: 'Invalid function call arguments from AI' });
+    if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+      for (const toolCall of responseMessage.tool_calls) {
+        if (toolCall.type === 'function') {
+          try {
+            const args = JSON.parse(toolCall.function.arguments);
+            functionCalls.push({
+              name: toolCall.function.name,
+              arguments: args,
+            });
+          } catch (parseError) {
+            console.error('Error parsing tool call arguments:', parseError);
+            return res.status(500).json({ error: 'Invalid tool call arguments from AI' });
+          }
+        }
       }
     }
 
@@ -159,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // 6. Return function calls to frontend for execution
+    // 7. Return success response
     const executionTime = Date.now() - startTime;
 
     return res.status(200).json({
@@ -173,6 +131,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Handle OpenAI API errors
     const err = error as { status?: number; code?: string; message?: string };
+    
     if (err.status === 429) {
       return res.status(429).json({ error: 'AI service is busy. Please try again in a moment.' });
     }

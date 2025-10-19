@@ -6,9 +6,34 @@
  */
 
 import { createShape, updateShape, getCanvasObjects } from './canvasObjects.service';
-import { normalizeColor } from '../utils/aiPrompts';
 import type { CanvasObject, ShapeType } from '../types';
 import type { FunctionCall, ExecutionResult } from '../types/ai';
+
+/**
+ * Color mapping for common color names
+ */
+const COLOR_MAP: Record<string, string> = {
+  red: '#FF0000',
+  blue: '#0000FF',
+  green: '#00FF00',
+  yellow: '#FFFF00',
+  orange: '#FFA500',
+  purple: '#800080',
+  pink: '#FFC0CB',
+  black: '#000000',
+  white: '#FFFFFF',
+  gray: '#808080',
+  grey: '#808080',
+  brown: '#A52A2A',
+};
+
+/**
+ * Normalize color input (convert color names to hex codes)
+ */
+function normalizeColor(color: string): string {
+  const normalized = color.toLowerCase().trim();
+  return COLOR_MAP[normalized] || color;
+}
 
 /**
  * Execute a single AI function call

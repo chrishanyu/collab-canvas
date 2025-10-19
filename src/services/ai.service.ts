@@ -1,8 +1,8 @@
 /**
- * AI Service: Frontend-to-API Communication
+ * AI Service: API Communication Layer
  * 
- * Handles communication with the Vercel serverless function
- * for AI command processing
+ * Handles communication with the Vercel serverless function (/api/ai-command)
+ * API key stays secure on the backend
  */
 
 import { auth } from './firebase';
@@ -65,7 +65,7 @@ export async function sendAICommand(
         errorData = JSON.parse(text);
       } catch (parseError) {
         console.error('[AI Service] Failed to parse error response');
-        errorData = { error: `Server error (${response.status}). The API endpoint may not be deployed yet.` };
+        errorData = { error: `Server error (${response.status})` };
       }
       
       if (response.status === 401) {
@@ -73,7 +73,7 @@ export async function sendAICommand(
       }
       
       if (response.status === 404) {
-        throw new Error('AI endpoint not found. Have you deployed the /api/ai-command serverless function to Vercel?');
+        throw new Error('AI endpoint not found. Please check deployment.');
       }
       
       if (response.status === 429) {
@@ -90,13 +90,15 @@ export async function sendAICommand(
     const data: AICommandResponse = await response.json();
     return data;
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Handle fetch errors
-    if (error.name === 'AbortError') {
+    const err = error as { name?: string; message?: string };
+    
+    if (err.name === 'AbortError') {
       throw new Error('Request timeout. AI service is taking too long to respond.');
     }
 
-    if (error.message === 'Failed to fetch') {
+    if (err.message === 'Failed to fetch') {
       throw new Error('Network error. Please check your connection.');
     }
 
@@ -106,7 +108,7 @@ export async function sendAICommand(
 }
 
 /**
- * Test AI service connectivity
+ * Test OpenAI connectivity
  */
 export async function testAIService(): Promise<boolean> {
   try {
@@ -117,7 +119,7 @@ export async function testAIService(): Promise<boolean> {
     );
     return response.success;
   } catch (error) {
-    console.error('AI service test failed:', error);
+    console.error('[AI Service] Test failed:', error);
     return false;
   }
 }

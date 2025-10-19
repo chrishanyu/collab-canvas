@@ -18,7 +18,7 @@ interface UseConnectionStatusReturn {
 export const useConnectionStatus = (): UseConnectionStatusReturn => {
   const [status, setStatus] = useState<ConnectionStatus>('online');
   const [isConnected, setIsConnected] = useState(true);
-  const timerRef = useRef<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     // Initialize based on current navigator status

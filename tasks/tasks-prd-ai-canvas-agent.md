@@ -8,14 +8,18 @@
 
 ## Relevant Files
 
-### Backend / API
-- `api/ai-command.ts` - Vercel serverless function for AI command processing
-- `api/ai-command.test.ts` - Tests for AI command API endpoint
+### Backend (Vercel Serverless Function)
+- `api/ai-command.ts` - Main API endpoint handler
+- `api/lib/openai.ts` - OpenAI client configuration
+- `api/lib/prompts.ts` - System prompts (centralized)
+- `api/lib/schemas.ts` - Function schemas (centralized)
+- `api/lib/auth.ts` - Authentication verification
+- `api/lib/rateLimit.ts` - Rate limiting logic
 
-### Services
-- `src/services/ai.service.ts` - AI service for communicating with backend API
+### Frontend Services
+- `src/services/ai.service.ts` - API communication layer
 - `src/services/ai.service.test.ts` - Unit tests for AI service
-- `src/services/aiCommands.ts` - AI command execution logic (function implementations)
+- `src/services/aiCommands.ts` - AI command execution logic
 - `src/services/aiCommands.test.ts` - Unit tests for command execution
 
 ### Hooks
@@ -46,10 +50,14 @@
 
 ### Notes
 
-- OpenAI SDK v4.x will be added as a dependency: `npm install openai`
+- **Architecture:** Secure serverless function with modular organization
+- **Backend:** Vercel serverless function handles OpenAI communication
+- **API Key:** Stored in `OPENAI_API_KEY` (server-side only, secure)
+- **Modules:** Prompts, schemas, auth, rate limiting separated into `/api/lib/`
+- **See:** `AI-ARCHITECTURE.md` for detailed architecture decisions
+- **See:** `CHECKPOINT-1-SETUP.md` for setup and testing instructions
 - Unit tests should be placed alongside the code files they are testing
 - Use `npm run test` to run all tests
-- Use `npm run test -- [path/to/test/file]` to run specific test files
 
 ---
 
