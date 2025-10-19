@@ -10,11 +10,11 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import OpenAI from 'openai';
-import { openai, AI_CONFIG } from './lib/openai';
-import { SYSTEM_PROMPT } from './lib/prompts';
-import { TOOLS } from './lib/schemas';
-import { verifyAuthToken } from './lib/auth';
-import { checkRateLimit } from './lib/rateLimit';
+import { openai, AI_CONFIG } from './lib/openai.js';
+import { SYSTEM_PROMPT } from './lib/prompts.js';
+import { TOOLS } from './lib/schemas.js';
+import { verifyAuthToken } from './lib/auth.js';
+import { checkRateLimit } from './lib/rateLimit.js';
 
 /**
  * Main handler

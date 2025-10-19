@@ -12,8 +12,5 @@ export const openai = new OpenAI({
 
 // Configuration constants
 export const AI_CONFIG = {
-  model: 'gpt-4-turbo-preview',
-  temperature: 0.3,
-  maxTokens: 500,
+  model: 'gpt-5-nano', // Fast and capable for tool calling
 } as const;
-

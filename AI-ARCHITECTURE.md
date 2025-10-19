@@ -30,8 +30,8 @@ The AI Canvas Agent uses a **secure serverless function** architecture where the
 ┌─────────────────────────────────────────────┐
 │ OpenAI API                                  │
 │  ├─ GPT-4 Turbo model                       │
-│  ├─ Function calling feature                │
-│  └─ Returns structured function calls       │
+│  ├─ Modern Tools API (not deprecated)       │
+│  └─ Returns structured tool calls           │
 └──────────────────┬──────────────────────────┘
                    │
                    ↓ Response
@@ -53,10 +53,17 @@ The AI Canvas Agent uses a **secure serverless function** architecture where the
 - Rate limiting enforced server-side
 - Authentication verified before processing
 
+### ✅ Modern Tools API
+
+**Why:** Latest OpenAI API (not deprecated functions API)
+- Uses `tools` parameter with `tool_choice: 'auto'`
+- Supports multiple tool calls in single response
+- Better structured and more reliable than old `functions` API
+
 ### ✅ Client-Side Function Execution
 
 **Why:** Canvas operations need direct access to Firebase
-- AI returns function calls (e.g., `createShape`)
+- AI returns tool calls (e.g., `createShape`)
 - Frontend executes using existing `canvasObjects.service.ts`
 - Real-time sync happens automatically via Firebase listeners
 - No duplicate logic between frontend and backend
