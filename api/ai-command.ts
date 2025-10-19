@@ -102,6 +102,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         contextMessage += `${recentIndex}. ${shape.type} (id: ${shape.id})${isSelected ? ' [SELECTED]' : ''} - pos: (${shape.x}, ${shape.y}), size: ${shape.width}x${shape.height}, color: ${shape.fill}${shape.text ? `, text: "${shape.text}"` : ''}\n`;
       });
       
+      console.log('[AI-DEBUG] Canvas state sent to AI:', contextMessage);
+      
       messages.push({
         role: 'system',
         content: contextMessage,
@@ -123,6 +125,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'No response from AI' });
     }
 
+    console.log('[AI-DEBUG] AI Response tool calls:', JSON.stringify(responseMessage.tool_calls, null, 2));
+
     // 6. Parse tool calls (supports multiple calls in one response!)
     const functionCalls: Array<{ name: string; arguments: Record<string, unknown> }> = [];
 
@@ -142,6 +146,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
     }
+
+    console.log('[AI-DEBUG] Parsed function calls:', JSON.stringify(functionCalls, null, 2));
 
     // If no function calls, return error
     if (functionCalls.length === 0) {

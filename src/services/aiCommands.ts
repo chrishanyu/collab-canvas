@@ -45,6 +45,8 @@ export async function executeFunctionCall(
   _userName: string
 ): Promise<ExecutionResult> {
   try {
+    console.log('[AI-EXECUTE] Executing function:', functionCall.name, 'with args:', functionCall.arguments);
+    
     switch (functionCall.name) {
       // Creation commands
       case 'createShape':
