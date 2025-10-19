@@ -88,9 +88,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Add canvas state as context if provided
     if (canvasState && canvasState.shapes && canvasState.shapes.length > 0) {
+      const shapesToSend = canvasState.shapes.slice(-20); // Send last 20 shapes (most recent)
+      const selectedShapeIds = canvasState.selectedShapeIds || [];
+      
+      let contextMessage = `Current canvas state:\n`;
+      contextMessage += `- Total shapes: ${canvasState.shapes.length}\n`;
+      contextMessage += `- Selected shapes: ${selectedShapeIds.length > 0 ? selectedShapeIds.join(', ') : 'none'}\n`;
+      contextMessage += `\nShapes (most recent ${shapesToSend.length}):\n`;
+      
+      shapesToSend.forEach((shape: any, index: number) => {
+        const isSelected = selectedShapeIds.includes(shape.id);
+        const recentIndex = canvasState.shapes.length - shapesToSend.length + index + 1;
+        contextMessage += `${recentIndex}. ${shape.type} (id: ${shape.id})${isSelected ? ' [SELECTED]' : ''} - pos: (${shape.x}, ${shape.y}), size: ${shape.width}x${shape.height}, color: ${shape.fill}${shape.text ? `, text: "${shape.text}"` : ''}\n`;
+      });
+      
       messages.push({
         role: 'system',
-        content: `Current canvas state: ${canvasState.shapes.length} shapes present. ${JSON.stringify(canvasState.shapes.slice(0, 5))}`,
+        content: contextMessage,
       });
     }
 
