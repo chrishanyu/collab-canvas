@@ -5,7 +5,8 @@
  * Positioned as a floating panel for easy access
  */
 
-import React, { useState, KeyboardEvent } from 'react';
+import React, { useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { useAIAgent } from '../../hooks/useAIAgent';
 import type { CanvasState } from '../../types/ai';
 

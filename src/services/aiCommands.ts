@@ -8,7 +8,7 @@
 import { createShape, updateShape, getCanvasObjects } from './canvasObjects.service';
 import { normalizeColor } from '../utils/aiPrompts';
 import type { CanvasObject, ShapeType } from '../types';
-import type { FunctionCall, ExecutionResult, CanvasState } from '../types/ai';
+import type { FunctionCall, ExecutionResult } from '../types/ai';
 
 /**
  * Execute a single AI function call
@@ -17,7 +17,7 @@ export async function executeFunctionCall(
   functionCall: FunctionCall,
   canvasId: string,
   userId: string,
-  userName: string
+  _userName: string
 ): Promise<ExecutionResult> {
   try {
     switch (functionCall.name) {
@@ -219,21 +219,9 @@ async function executeMoveShape(
  */
 async function executeGetCanvasState(canvasId: string): Promise<ExecutionResult> {
   try {
-    const shapes = await getCanvasObjects(canvasId);
-
-    // Convert to simplified state for AI
-    const canvasState: CanvasState = {
-      shapes: shapes.map(shape => ({
-        id: shape.id,
-        type: shape.type,
-        x: shape.x,
-        y: shape.y,
-        width: shape.width,
-        height: shape.height,
-        fill: shape.fill,
-        text: shape.text,
-      })),
-    };
+    // Fetch canvas objects but don't need to return them to the UI
+    // This function is used by AI to get context, the data is already in memory
+    await getCanvasObjects(canvasId);
 
     // Note: This function is used for AI context, not user-facing
     // Success but no shapes created
