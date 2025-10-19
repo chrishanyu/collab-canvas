@@ -5,7 +5,7 @@
  * Uses existing canvas services for all operations
  */
 
-import { createShape, updateShape, deleteShape, getCanvasObjects } from './canvasObjects.service';
+import { createShape, createShapesBatch, updateShape, deleteShape, getCanvasObjects } from './canvasObjects.service';
 import type { CanvasObject, ShapeType } from '../types';
 import type { FunctionCall, ExecutionResult } from '../types/ai';
 
@@ -629,29 +629,32 @@ async function executeCreateGrid(
   const startX = -totalWidth / 2;
   const startY = -totalHeight / 2;
 
-  // Create all shapes
-  const createdIds: string[] = [];
+  // Prepare all shapes for batch creation
+  const shapesToCreate: Array<Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'lastEditedBy'>> = [];
 
-  try {
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        const x = startX + col * (size + spacing);
-        const y = startY + row * (size + spacing);
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const x = startX + col * (size + spacing);
+      const y = startY + row * (size + spacing);
 
-        const shape: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'lastEditedBy'> = {
-          type: shapeType as ShapeType,
-          x,
-          y,
-          width: size,
-          height: size,
-          fill: normalizedColor,
-          createdBy: userId,
-        };
+      const shape: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'lastEditedBy'> = {
+        type: shapeType as ShapeType,
+        x,
+        y,
+        width: size,
+        height: size,
+        fill: normalizedColor,
+        createdBy: userId,
+      };
 
-        const createdShape = await createShape(canvasId, shape);
-        createdIds.push(createdShape.id);
-      }
+      shapesToCreate.push(shape);
     }
+  }
+
+  // Create all shapes in a single batch write (much faster!)
+  try {
+    const createdShapes = await createShapesBatch(canvasId, shapesToCreate);
+    const createdIds = createdShapes.map(shape => shape.id);
 
     return {
       success: true,

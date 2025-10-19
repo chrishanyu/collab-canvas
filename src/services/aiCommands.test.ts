@@ -16,6 +16,7 @@ import type { CanvasObject } from '../types';
 // Mock canvas objects service
 vi.mock('./canvasObjects.service', () => ({
   createShape: vi.fn(),
+  createShapesBatch: vi.fn(),
   updateShape: vi.fn(),
   deleteShape: vi.fn(),
   getCanvasObjects: vi.fn(),
@@ -1161,8 +1162,9 @@ describe('AI Command Execution Service', () => {
 
     describe('createGrid', () => {
       it('should create a grid of shapes', async () => {
-        const mockCreatedShape: CanvasObject = {
-          id: 'grid-shape',
+        // Mock batch creation - 2 rows x 3 cols = 6 shapes
+        const mockCreatedShapes: CanvasObject[] = Array.from({ length: 6 }, (_, i) => ({
+          id: `grid-shape-${i}`,
           type: 'rectangle',
           x: 0,
           y: 0,
@@ -1174,9 +1176,9 @@ describe('AI Command Execution Service', () => {
           updatedAt: new Date(),
           version: 1,
           lastEditedBy: mockUserId,
-        };
+        }));
 
-        vi.mocked(canvasObjectsService.createShape).mockResolvedValue(mockCreatedShape);
+        vi.mocked(canvasObjectsService.createShapesBatch).mockResolvedValue(mockCreatedShapes);
 
         const functionCall: FunctionCall = {
           name: 'createGrid',
@@ -1198,8 +1200,19 @@ describe('AI Command Execution Service', () => {
         );
 
         expect(result.success).toBe(true);
-        expect(canvasObjectsService.createShape).toHaveBeenCalledTimes(6); // 2 rows * 3 cols
-        expect(result.shapeIds?.length).toBe(6);
+        expect(canvasObjectsService.createShapesBatch).toHaveBeenCalledTimes(1); // Single batch write
+        expect(canvasObjectsService.createShapesBatch).toHaveBeenCalledWith(
+          mockCanvasId,
+          expect.arrayContaining([
+            expect.objectContaining({
+              type: 'rectangle',
+              width: 50,
+              height: 50,
+              fill: '#0000FF',
+            }),
+          ])
+        );
+        expect(result.shapeIds?.length).toBe(6); // 2 rows * 3 cols
       });
 
       it('should fail when grid is too large', async () => {

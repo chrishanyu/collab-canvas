@@ -90,6 +90,9 @@ export const Canvas: React.FC = () => {
   // Shapes panel state
   const [isShapesPanelOpen, setIsShapesPanelOpen] = useState(false);
   
+  // AI panel state
+  const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
+  
   // Preview shape state (for ghost shape following cursor)
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null);
   
@@ -221,6 +224,12 @@ export const Canvas: React.FC = () => {
           return;
         }
         
+        // Then close AI panel
+        if (isAIPanelOpen) {
+          setIsAIPanelOpen(false);
+          return;
+        }
+        
         // Then close shapes panel
         if (isShapesPanelOpen) {
           setIsShapesPanelOpen(false);
@@ -231,7 +240,7 @@ export const Canvas: React.FC = () => {
         if (selectedShapeIds.length > 0) {
           clearSelection();
     }
-  }, [creatingShapeType, isShapesPanelOpen, selectedShapeIds, clearSelection]);
+  }, [creatingShapeType, isAIPanelOpen, isShapesPanelOpen, selectedShapeIds, clearSelection]);
 
   const handleDeleteShapes = useCallback(() => {
     if (selectedShapeIds.length === 0 || !canvasId) return;
@@ -594,6 +603,10 @@ export const Canvas: React.FC = () => {
       });
   }, [selectedShapeIds, shapes, canvasId, currentUser, showError]);
 
+  // AI panel handlers
+  const handleToggleAI = useCallback(() => {
+    setIsAIPanelOpen((prev) => !prev);
+  }, []);
 
   // Keyboard shortcuts setup
   useKeyboardShortcuts([
@@ -641,6 +654,13 @@ export const Canvas: React.FC = () => {
       meta: true,
       handler: handleDuplicate,
       preventDefault: true, // Prevent browser bookmark dialog
+    },
+    // Cmd/Ctrl+K: Toggle AI panel
+    {
+      key: 'k',
+      meta: true,
+      handler: handleToggleAI,
+      preventDefault: true,
     },
     // Arrow keys: Move shapes 10px
     {
@@ -1458,6 +1478,8 @@ export const Canvas: React.FC = () => {
         onSetMode={handleSetMode}
         onToggleShapes={handleToggleShapesPanel}
         onCreateText={handleCreateText}
+        isAIPanelOpen={isAIPanelOpen}
+        onToggleAI={handleToggleAI}
       />
 
       {/* Shapes Panel */}
@@ -1630,12 +1652,13 @@ export const Canvas: React.FC = () => {
         );
       })()}
 
-      {/* AI Command Input */}
-      {currentUser && canvasId && (
+      {/* AI Command Input - Conditional Floating Panel */}
+      {currentUser && canvasId && isAIPanelOpen && (
         <AICommandInput
           canvasId={canvasId}
           userId={currentUser.id}
           userName={currentUser.displayName}
+          onClose={handleToggleAI}
           canvasState={{
             shapes: shapes.map(shape => ({
               id: shape.id,

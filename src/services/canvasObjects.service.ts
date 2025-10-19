@@ -11,7 +11,8 @@ import {
   Timestamp,
   query,
   orderBy,
-  increment
+  increment,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { CanvasObject } from '../types';
@@ -218,6 +219,102 @@ export async function createShape(
   } catch (error) {
     console.error('Error creating shape:', error);
     throw new Error('Failed to create shape');
+  }
+}
+
+/**
+ * Creates multiple shapes in a single batch write operation
+ * Much more efficient than creating shapes individually
+ * 
+ * @param canvasId - Canvas ID
+ * @param shapes - Array of shapes to create (without id, timestamps, version)
+ * @returns Array of created CanvasObjects with IDs
+ */
+export async function createShapesBatch(
+  canvasId: string,
+  shapes: Array<Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'lastEditedBy'>>,
+  customIds?: string[]
+): Promise<CanvasObject[]> {
+  try {
+    if (shapes.length === 0) {
+      return [];
+    }
+
+    // Firebase batches are limited to 500 operations
+    const MAX_BATCH_SIZE = 500;
+    if (shapes.length > MAX_BATCH_SIZE) {
+      throw new Error(`Cannot create more than ${MAX_BATCH_SIZE} shapes in a single batch`);
+    }
+
+    const batch = writeBatch(db);
+    const objectsRef = getObjectsCollection(canvasId);
+    const createdShapes: CanvasObject[] = [];
+
+    shapes.forEach((shape, index) => {
+      // Generate unique shape ID (or use provided custom ID)
+      const shapeRef = customIds && customIds[index] 
+        ? doc(objectsRef, customIds[index]) 
+        : doc(objectsRef);
+      const shapeId = shapeRef.id;
+
+      // Shape data with timestamps and version tracking
+      const shapeData: Record<string, unknown> = {
+        type: shape.type,
+        x: shape.x,
+        y: shape.y,
+        width: shape.width,
+        height: shape.height,
+        fill: shape.fill,
+        zIndex: 0, // Default layer order
+        createdBy: shape.createdBy,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        version: 1,
+        lastEditedBy: shape.createdBy,
+      };
+
+      // Only include optional properties if defined
+      if (shape.stroke !== undefined) shapeData.stroke = shape.stroke;
+      if (shape.strokeWidth !== undefined) shapeData.strokeWidth = shape.strokeWidth;
+      if (shape.rotation !== undefined) shapeData.rotation = shape.rotation;
+      if (shape.text !== undefined) shapeData.text = shape.text;
+      if (shape.textFormat !== undefined) shapeData.textFormat = shape.textFormat;
+
+      // Add to batch
+      batch.set(shapeRef, shapeData);
+
+      // Construct the returned shape object
+      const createdShape: CanvasObject = {
+        id: shapeId,
+        type: shape.type,
+        x: shape.x,
+        y: shape.y,
+        width: shape.width,
+        height: shape.height,
+        fill: shape.fill,
+        stroke: shape.stroke,
+        strokeWidth: shape.strokeWidth,
+        rotation: shape.rotation,
+        zIndex: 0,
+        text: shape.text,
+        textFormat: shape.textFormat,
+        createdBy: shape.createdBy,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        version: 1,
+        lastEditedBy: shape.createdBy,
+      };
+
+      createdShapes.push(createdShape);
+    });
+
+    // Commit the batch
+    await batch.commit();
+
+    return createdShapes;
+  } catch (error) {
+    console.error('Error creating shapes batch:', error);
+    throw new Error('Failed to create shapes in batch');
   }
 }
 
