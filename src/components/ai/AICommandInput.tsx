@@ -5,16 +5,19 @@
  * Positioned as a floating panel for easy access
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { KeyboardEvent } from 'react';
+import { X } from 'lucide-react';
 import { useAIAgent } from '../../hooks/useAIAgent';
 import type { CanvasState } from '../../types/ai';
+import { CommandHistory, addToCommandHistory } from './CommandHistory';
 
 interface AICommandInputProps {
   canvasId: string;
   userId: string;
   userName: string;
   canvasState?: CanvasState;
+  onClose?: () => void;
 }
 
 export const AICommandInput: React.FC<AICommandInputProps> = ({
@@ -22,6 +25,7 @@ export const AICommandInput: React.FC<AICommandInputProps> = ({
   userId,
   userName,
   canvasState,
+  onClose,
 }) => {
   const [command, setCommand] = useState('');
   const { state, executeCommand } = useAIAgent({
@@ -31,15 +35,28 @@ export const AICommandInput: React.FC<AICommandInputProps> = ({
     canvasState,
   });
 
-  const handleSubmit = async () => {
-    if (!command.trim() || state.isLoading) return;
-    
-    await executeCommand(command);
-    
-    // Clear input on success
-    if (state.status === 'success') {
+  // Track previous status to detect transitions
+  const previousStatusRef = useRef(state.status);
+
+  // Clear input and save to history when transitioning to success state
+  useEffect(() => {
+    if (previousStatusRef.current !== 'success' && state.status === 'success') {
+      // Save command to history before clearing
+      if (state.lastCommand) {
+        addToCommandHistory(canvasId, state.lastCommand);
+      }
       setCommand('');
     }
+    previousStatusRef.current = state.status;
+  }, [state.status, state.lastCommand, canvasId]);
+
+  const handleSubmit = async () => {
+    if (!command.trim() || state.isLoading) return;
+    await executeCommand(command);
+  };
+
+  const handleSelectHistoryCommand = (historicalCommand: string) => {
+    setCommand(historicalCommand);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -64,11 +81,22 @@ export const AICommandInput: React.FC<AICommandInputProps> = ({
   };
 
   return (
-    <div className="fixed top-4 right-4 z-50 w-80 bg-white rounded-lg shadow-lg border border-gray-200">
+    <div className="fixed top-4 right-4 z-50 w-80 bg-white rounded-lg shadow-lg border border-gray-200 animate-in fade-in slide-in-from-top-2 duration-200">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200">
-        <span className="text-2xl">🤖</span>
-        <span className="font-semibold text-gray-800">AI Canvas Agent</span>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">🤖</span>
+          <span className="font-semibold text-gray-800">AI Assistant</span>
+        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded hover:bg-gray-100"
+            title="Close AI Panel (Cmd/Ctrl+K)"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Input Area */}
@@ -148,6 +176,14 @@ export const AICommandInput: React.FC<AICommandInputProps> = ({
               <li>"Add text that says Hello"</li>
             </ul>
           </div>
+        )}
+
+        {/* Command History */}
+        {!state.isLoading && (
+          <CommandHistory
+            canvasId={canvasId}
+            onSelectCommand={handleSelectHistoryCommand}
+          />
         )}
       </div>
     </div>

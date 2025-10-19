@@ -100,6 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       messages,
       tools: TOOLS,
       tool_choice: 'auto',
+      reasoning_effort: 'minimal',
     });
 
     const responseMessage = completion.choices[0]?.message;

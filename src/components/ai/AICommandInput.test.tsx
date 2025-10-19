@@ -43,7 +43,7 @@ describe('AICommandInput', () => {
       render(<AICommandInput {...defaultProps} />);
 
       expect(screen.getByText('🤖')).toBeInTheDocument();
-      expect(screen.getByText('AI Canvas Agent')).toBeInTheDocument();
+      expect(screen.getByText('AI Assistant')).toBeInTheDocument();
     });
 
     it('should render input field with placeholder', () => {

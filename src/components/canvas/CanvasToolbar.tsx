@@ -1,20 +1,22 @@
 import React from 'react';
-import { MousePointer2, Hand, Shapes, Type as TypeIcon } from 'lucide-react';
+import { MousePointer2, Hand, Shapes, Type as TypeIcon, Sparkles } from 'lucide-react';
 
 interface CanvasToolbarProps {
   interactionMode: 'select' | 'pan';
   onSetMode: (mode: 'select' | 'pan') => void;
   onToggleShapes: () => void;
   onCreateText: () => void;
+  isAIPanelOpen?: boolean;
+  onToggleAI: () => void;
 }
 
 /**
  * CanvasToolbar Component
  * 
  * Floating toolbar at bottom-center of canvas.
- * Provides mode toggle buttons (Select/Pan) and action buttons (Shapes/Text).
+ * Provides mode toggle buttons (Select/Pan) and action buttons (Shapes/Text/AI).
  * 
- * Layout: [Select][Pan] | [Shapes][Text]
+ * Layout: [Select][Pan] | [Shapes] | [Text] | [AI]
  * Position: Bottom-center (16px from bottom)
  * Note: Zoom controls are in ZoomControls component (bottom-right)
  */
@@ -23,6 +25,8 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
   onSetMode,
   onToggleShapes,
   onCreateText,
+  isAIPanelOpen = false,
+  onToggleAI,
 }) => {
   return (
     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-white rounded-lg shadow-lg px-2 py-2 flex items-center gap-2">
@@ -80,6 +84,23 @@ export const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
           title="Create Text Box"
         >
           <TypeIcon className="w-4 h-4" />
+        </button>
+        
+        {/* Vertical Separator */}
+        <div className="w-px h-8 bg-gray-300"></div>
+        
+        {/* AI Button */}
+        <button
+          onClick={onToggleAI}
+          className={`px-3 py-2 text-sm rounded transition-all duration-200 font-medium flex items-center gap-1.5 ${
+            isAIPanelOpen
+              ? 'bg-purple-500 text-white hover:bg-purple-600'
+              : 'bg-white hover:bg-gray-100 text-gray-700'
+          }`}
+          title="AI Assistant (Cmd/Ctrl+K)"
+        >
+          <Sparkles className="w-4 h-4" />
+          <span>AI</span>
         </button>
       </div>
     </div>
