@@ -8,9 +8,13 @@
 import { auth } from './firebase';
 import type { AICommandRequest, AICommandResponse } from '../types/ai';
 
+// In dev: Use production API endpoint if VITE_API_BASE_URL is set
+// In prod: Use relative path (same domain)
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const AI_COMMAND_ENDPOINT = `${API_BASE_URL}/api/ai-command`;
 const REQUEST_TIMEOUT = 10000; // 10 seconds
+
+console.log('[AI Service] Using endpoint:', AI_COMMAND_ENDPOINT);
 
 /**
  * Send AI command to backend for processing
