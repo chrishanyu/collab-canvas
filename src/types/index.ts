@@ -31,6 +31,7 @@ export interface CanvasObject {
   stroke?: string; // Border color
   strokeWidth?: number; // Border width in pixels
   rotation?: number; // Rotation angle in degrees
+  zIndex?: number; // Layer order - higher values render on top (default: 0)
   text?: string; // Text content for text labels on shapes
   textFormat?: {
     bold?: boolean;

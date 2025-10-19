@@ -89,3 +89,27 @@ export const getUserCursorColor = (userId: string, currentUserId: string): strin
 
   return userColors[index];
 };
+
+/**
+ * Get the maximum zIndex from an array of shapes
+ * @param shapes - Array of canvas objects
+ * @returns Maximum zIndex value, or 0 if no shapes
+ */
+export const getMaxZIndex = (shapes: Array<{ zIndex?: number }>): number => {
+  if (shapes.length === 0) return 0;
+  
+  const zIndices = shapes.map(shape => shape.zIndex ?? 0);
+  return Math.max(...zIndices);
+};
+
+/**
+ * Get the minimum zIndex from an array of shapes
+ * @param shapes - Array of canvas objects
+ * @returns Minimum zIndex value, or 0 if no shapes
+ */
+export const getMinZIndex = (shapes: Array<{ zIndex?: number }>): number => {
+  if (shapes.length === 0) return 0;
+  
+  const zIndices = shapes.map(shape => shape.zIndex ?? 0);
+  return Math.min(...zIndices);
+};

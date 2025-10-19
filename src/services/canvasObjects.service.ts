@@ -74,6 +74,7 @@ export function subscribeToCanvasObjects(
             stroke: data.stroke,
             strokeWidth: data.strokeWidth,
             rotation: data.rotation,
+            zIndex: data.zIndex, // Layer order
             text: data.text,
             textFormat: data.textFormat,
             createdBy: data.createdBy,
@@ -127,6 +128,7 @@ export async function getCanvasObjects(canvasId: string): Promise<CanvasObject[]
         stroke: data.stroke,
         strokeWidth: data.strokeWidth,
         rotation: data.rotation,
+        zIndex: data.zIndex, // Layer order
         text: data.text,
         textFormat: data.textFormat,
         createdBy: data.createdBy,
@@ -148,28 +150,31 @@ export async function getCanvasObjects(canvasId: string): Promise<CanvasObject[]
  * Creates a new shape in a canvas
  * @param canvasId - Canvas ID
  * @param shape - Shape data (without id, createdAt, updatedAt, version, lastEditedBy)
+ * @param customId - Optional pre-generated ID for optimistic updates
  * @returns Created shape with id and timestamps
  */
 export async function createShape(
   canvasId: string,
-  shape: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'lastEditedBy'>
+  shape: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'lastEditedBy'>,
+  customId?: string
 ): Promise<CanvasObject> {
   try {
-    // Generate unique shape ID
+    // Generate unique shape ID (or use provided custom ID for optimistic updates)
     const objectsRef = getObjectsCollection(canvasId);
-    const shapeRef = doc(objectsRef);
+    const shapeRef = customId ? doc(objectsRef, customId) : doc(objectsRef);
     const shapeId = shapeRef.id;
     
     // Shape data with timestamps and version tracking
     // Filter out undefined values (Firebase doesn't accept undefined)
+    // Note: We don't store 'id' in the document data - it's the document ID
     const shapeData: Record<string, unknown> = {
-      id: shapeId,
       type: shape.type,
       x: shape.x,
       y: shape.y,
       width: shape.width,
       height: shape.height,
       fill: shape.fill,
+      zIndex: 0, // Default layer order
       createdBy: shape.createdBy,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -199,6 +204,7 @@ export async function createShape(
       stroke: shape.stroke,
       strokeWidth: shape.strokeWidth,
       rotation: shape.rotation,
+      zIndex: 0, // Default layer order
       text: shape.text,
       textFormat: shape.textFormat,
       createdBy: shape.createdBy,
