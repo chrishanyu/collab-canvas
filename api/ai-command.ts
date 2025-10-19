@@ -79,8 +79,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       messages,
       tools: TOOLS,
       tool_choice: 'auto',
-      temperature: AI_CONFIG.temperature,
-      max_tokens: AI_CONFIG.maxTokens,
     });
 
     const responseMessage = completion.choices[0]?.message;
