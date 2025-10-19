@@ -7,6 +7,8 @@ import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { useToast } from '../../hooks/useToast';
 import { usePersistedViewport } from '../../hooks/usePersistedViewport';
 import { useActiveEdits } from '../../hooks/useActiveEdits';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { useRecentColors } from '../../hooks/useRecentColors';
 import { getCanvasById } from '../../services/canvas.service';
 import { createShape as createShapeInFirebase, updateShape as updateShapeInFirebase, deleteShape as deleteShapeInFirebase } from '../../services/canvasObjects.service';
 import { LoadingSpinner } from '../common/LoadingSpinner';
@@ -22,7 +24,8 @@ import { PreviewShape } from './PreviewShape';
 import { TransformHandles } from './TransformHandles';
 import { GridDots } from './GridDots';
 import { UserPresence } from '../presence/UserPresence';
-import { constrainZoom, getRelativePointerPosition, generateUniqueId } from '../../utils/canvasHelpers';
+import { ShapeEditBar } from './ShapeEditBar';
+import { constrainZoom, getRelativePointerPosition, generateUniqueId, getMaxZIndex, getMinZIndex } from '../../utils/canvasHelpers';
 import type { Canvas as CanvasType, CanvasObject, ShapeType } from '../../types';
 import { ConflictError } from '../../types';
 import {
@@ -52,7 +55,7 @@ import {
 export const Canvas: React.FC = () => {
   const { canvasId } = useParams<{ canvasId: string }>();
   const { currentUser } = useAuth();
-  const { showError, showWarning } = useToast();
+  const { showError, showWarning, showSuccess } = useToast();
   const stageRef = useRef<Konva.Stage>(null);
 
   const [canvas, setCanvas] = useState<CanvasType | null>(null);
@@ -100,11 +103,21 @@ export const Canvas: React.FC = () => {
   // Share modal state
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   
+  // Clipboard state for copy/paste
+  const [clipboardShapes, setClipboardShapes] = useState<CanvasObject[]>([]);
+  
   // Track which shape is currently being dragged
   const draggingShapeIdRef = useRef<string | null>(null);
   
   // Track initial positions of all selected shapes for group drag
   const groupDragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
+  
+  // Track pending Firebase writes to prevent race conditions
+  // Map<shapeId, expectedVersion> - shapes with pending writes won't be updated by Firebase listener
+  const pendingUpdates = useRef<Map<string, number>>(new Map());
+  
+  // Debounce timer for arrow key Firebase updates
+  const arrowKeyDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Track if stage was panned (to distinguish click from drag in Pan mode)
   const stagePannedRef = useRef<boolean>(false);
@@ -119,6 +132,9 @@ export const Canvas: React.FC = () => {
   const {
     getShapeEditor,
   } = useActiveEdits(canvasId || '', currentUser?.id || '');
+
+  // Recent colors management (stored per-user in Firebase)
+  const { recentColors, addRecentColor } = useRecentColors(currentUser?.id);
 
   // Selection helper functions
   const isSelected = useCallback((shapeId: string): boolean => {
@@ -181,13 +197,22 @@ export const Canvas: React.FC = () => {
     };
   }, [canvas?.name]);
 
-  // Keyboard shortcuts
+  // Clear clipboard when switching canvases
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // ESC key: Cancel shape creation, close panel, or deselect shape
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        
+    setClipboardShapes([]);
+  }, [canvasId]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (arrowKeyDebounceTimer.current) {
+        clearTimeout(arrowKeyDebounceTimer.current);
+      }
+    };
+  }, []);
+
+  // Keyboard shortcut handlers
+  const handleEscape = useCallback(() => {
         // Priority: Cancel shape creation first
         if (creatingShapeType) {
           setCreatingShapeType(null);
@@ -204,42 +229,440 @@ export const Canvas: React.FC = () => {
         // Finally deselect shapes
         if (selectedShapeIds.length > 0) {
           clearSelection();
-          return;
-        }
-      }
-      
-      // Delete/Backspace key: Delete selected shapes
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShapeIds.length > 0) {
-        // Prevent backspace from navigating back in browser
-        e.preventDefault();
-        
-        // Delete all selected shapes
-        if (canvasId) {
-          // Delete each selected shape
+    }
+  }, [creatingShapeType, isShapesPanelOpen, selectedShapeIds, clearSelection]);
+
+  const handleDeleteShapes = useCallback(() => {
+    if (selectedShapeIds.length === 0 || !canvasId) return;
+    
+    // Optimistically remove from local state first
+    setShapes(prevShapes => prevShapes.filter(s => !selectedShapeIds.includes(s.id)));
+    
+    // Delete each selected shape from Firebase
           selectedShapeIds.forEach(shapeId => {
             deleteShapeInFirebase(canvasId, shapeId)
-              .then(() => {
-                // Optimistically remove from local state
-                setShapes(prevShapes => prevShapes.filter(s => s.id !== shapeId));
-              })
               .catch(error => {
                 console.error('Failed to delete shape:', error);
                 showError(`Failed to delete shape. Please try again.`);
+          // Note: Firebase sync will restore the shape if delete failed
               });
           });
           
           // Clear selection after deleting
           clearSelection();
+  }, [selectedShapeIds, canvasId, clearSelection, showError]);
+
+  const handleCopy = useCallback(() => {
+    if (selectedShapeIds.length === 0) return;
+    
+    // Get the selected shapes
+    const shapesToCopy = shapes.filter(s => selectedShapeIds.includes(s.id));
+    
+    // Store in clipboard state
+    setClipboardShapes(shapesToCopy);
+    
+    // Show success toast
+    const count = shapesToCopy.length;
+    showSuccess(`Copied ${count} shape${count !== 1 ? 's' : ''}`);
+  }, [selectedShapeIds, shapes, showSuccess]);
+
+  const handlePaste = useCallback(async () => {
+    if (clipboardShapes.length === 0 || !canvasId || !currentUser) return;
+    
+    // Calculate the bounding box center of all clipboard shapes
+    const bounds = {
+      minX: Math.min(...clipboardShapes.map(s => s.x)),
+      maxX: Math.max(...clipboardShapes.map(s => s.x + s.width)),
+      minY: Math.min(...clipboardShapes.map(s => s.y)),
+      maxY: Math.max(...clipboardShapes.map(s => s.y + s.height)),
+    };
+    const clipboardCenterX = (bounds.minX + bounds.maxX) / 2;
+    const clipboardCenterY = (bounds.minY + bounds.maxY) / 2;
+    
+    // Calculate the viewport center in canvas coordinates
+    // Convert screen center to canvas coordinates using stage position and scale
+    const viewportCenterX = (window.innerWidth / 2 - stageX) / stageScale;
+    const viewportCenterY = (window.innerHeight / 2 - stageY) / stageScale;
+    
+    // Calculate offset to move clipboard center to viewport center
+    const offsetX = viewportCenterX - clipboardCenterX;
+    const offsetY = viewportCenterY - clipboardCenterY;
+    
+    const newShapeIds: string[] = [];
+    
+    // Paste each shape with offset to center in viewport (preserving relative positions)
+    for (const shape of clipboardShapes) {
+      // Generate unique ID client-side for optimistic update
+      const newId = generateUniqueId();
+      newShapeIds.push(newId);
+      
+      // Create shape data with offset to center in viewport
+      const shapeData = {
+        type: shape.type,
+        x: shape.x + offsetX,
+        y: shape.y + offsetY,
+        width: shape.width,
+        height: shape.height,
+        fill: shape.fill,
+        stroke: shape.stroke,
+        strokeWidth: shape.strokeWidth,
+        rotation: shape.rotation,
+        text: shape.text,
+        textFormat: shape.textFormat,
+        createdBy: currentUser.id,
+      };
+      
+      // Create optimistic shape for immediate local update
+      const optimisticShape: CanvasObject = {
+        ...shapeData,
+        id: newId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        version: 1,
+        lastEditedBy: currentUser.id,
+      };
+      
+      // Add to local state immediately (optimistic update)
+      setShapes(prevShapes => [...prevShapes, optimisticShape]);
+      
+      // Sync to Firebase with the same ID (in background)
+      createShapeInFirebase(canvasId, shapeData, newId)
+        .catch(error => {
+          console.error('Failed to paste shape:', error);
+          showError('Failed to paste shape. Please try again.');
+          // Remove from local state on failure
+          setShapes(prevShapes => prevShapes.filter(s => s.id !== newId));
+        });
+    }
+    
+    // Auto-select pasted shapes immediately
+    setSelectedShapeIds(newShapeIds);
+    
+    // Show success toast
+    const count = clipboardShapes.length;
+    showSuccess(`Pasted ${count} shape${count !== 1 ? 's' : ''}`);
+  }, [clipboardShapes, canvasId, currentUser, stageX, stageY, stageScale, showSuccess, showError]);
+
+  const handleCut = useCallback(() => {
+    if (selectedShapeIds.length === 0 || !canvasId) return;
+    
+    // Copy to clipboard first
+    const shapesToCut = shapes.filter(s => selectedShapeIds.includes(s.id));
+    setClipboardShapes(shapesToCut);
+    
+    // Optimistically remove from local state
+    setShapes(prevShapes => prevShapes.filter(s => !selectedShapeIds.includes(s.id)));
+    
+    // Delete each shape from Firebase
+    selectedShapeIds.forEach(shapeId => {
+      deleteShapeInFirebase(canvasId, shapeId)
+        .catch(error => {
+          console.error('Failed to cut shape:', error);
+          showError('Failed to cut shape. Please try again.');
+        });
+    });
+    
+    // Clear selection after cutting
+    clearSelection();
+    
+    // Show success toast
+    const count = shapesToCut.length;
+    showSuccess(`Cut ${count} shape${count !== 1 ? 's' : ''}`);
+  }, [selectedShapeIds, shapes, canvasId, clearSelection, showSuccess, showError]);
+
+  const handleDuplicate = useCallback(async () => {
+    if (selectedShapeIds.length === 0 || !canvasId || !currentUser) return;
+    
+    const shapesToDuplicate = shapes.filter(s => selectedShapeIds.includes(s.id));
+    const newShapeIds: string[] = [];
+    
+    // Duplicate each shape with 10px offset
+    for (const shape of shapesToDuplicate) {
+      // Generate unique ID client-side
+      const newId = generateUniqueId();
+      newShapeIds.push(newId);
+      
+      // Create shape data with 10px offset (not 20px like paste)
+      const shapeData = {
+        type: shape.type,
+        x: shape.x + 10,
+        y: shape.y + 10,
+        width: shape.width,
+        height: shape.height,
+        fill: shape.fill,
+        stroke: shape.stroke,
+        strokeWidth: shape.strokeWidth,
+        rotation: shape.rotation,
+        text: shape.text,
+        textFormat: shape.textFormat,
+        createdBy: currentUser.id,
+      };
+      
+      // Create optimistic shape
+      const optimisticShape: CanvasObject = {
+        ...shapeData,
+        id: newId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        version: 1,
+        lastEditedBy: currentUser.id,
+      };
+      
+      // Add to local state immediately
+      setShapes(prevShapes => [...prevShapes, optimisticShape]);
+      
+      // Sync to Firebase
+      createShapeInFirebase(canvasId, shapeData, newId)
+        .catch(error => {
+          console.error('Failed to duplicate shape:', error);
+          showError('Failed to duplicate shape. Please try again.');
+          setShapes(prevShapes => prevShapes.filter(s => s.id !== newId));
+        });
+    }
+    
+    // Auto-select duplicated shapes (deselect originals)
+    setSelectedShapeIds(newShapeIds);
+    
+    // Show success toast
+    const count = shapesToDuplicate.length;
+    showSuccess(`Duplicated ${count} shape${count !== 1 ? 's' : ''}`);
+  }, [selectedShapeIds, shapes, canvasId, currentUser, showSuccess, showError]);
+
+  // Arrow key movement handler
+  const handleArrowKeyMove = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
+    if (selectedShapeIds.length === 0 || !canvasId || !currentUser) return;
+    
+    // Calculate movement delta (10px per keypress)
+    const step = 10;
+    const deltaX = direction === 'left' ? -step : direction === 'right' ? step : 0;
+    const deltaY = direction === 'up' ? -step : direction === 'down' ? step : 0;
+    
+    // Store the shape IDs we're moving (snapshot current selection)
+    const shapesToMove = [...selectedShapeIds];
+    
+    // Optimistic update: Move shapes immediately
+    setShapes(prevShapes => {
+      return prevShapes.map(shape => {
+        if (shapesToMove.includes(shape.id)) {
+          const updatedShape = {
+            ...shape,
+            x: shape.x + deltaX,
+            y: shape.y + deltaY,
+            updatedAt: new Date(),
+            version: shape.version + 1,
+            lastEditedBy: currentUser.id,
+          };
+          
+          // Register pending update with NEW version
+          pendingUpdates.current.set(shape.id, updatedShape.version);
+          
+          return updatedShape;
         }
-      }
-    };
+        return shape;
+      });
+    });
     
-    window.addEventListener('keydown', handleKeyDown);
+    // Debounced Firebase update (100ms)
+    // This prevents too many Firebase writes during rapid key presses
+    if (arrowKeyDebounceTimer.current) {
+      clearTimeout(arrowKeyDebounceTimer.current);
+    }
     
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [creatingShapeType, isShapesPanelOpen, selectedShapeIds, canvasId, showError, clearSelection]);
+    arrowKeyDebounceTimer.current = setTimeout(() => {
+      // Use setShapes to access current state
+      setShapes(currentShapes => {
+        // Get the shapes that were moved (using the snapshot IDs)
+        const movedShapes = currentShapes.filter(s => shapesToMove.includes(s.id));
+        
+        // Update them in Firebase WITHOUT version checking
+        // Arrow key movements are low-risk position-only updates by the current user
+        // Skip version checking to avoid conflicts during rapid keypresses
+        Promise.all(
+          movedShapes.map(async shape => {
+            try {
+              await updateShapeInFirebase(
+                canvasId,
+                shape.id,
+                { x: shape.x, y: shape.y },
+                currentUser.id
+                // No version parameter = skip conflict checking
+              );
+            } catch (error) {
+              console.error(`Failed to update shape ${shape.id}:`, error);
+              // Silently fail - shape is already moved locally
+            }
+          })
+        ).catch(error => {
+          console.error('Failed to update shape positions:', error);
+          // Don't show error toast for arrow key movements
+          
+          // Clear pending updates on error
+          shapesToMove.forEach(shapeId => {
+            pendingUpdates.current.delete(shapeId);
+          });
+        });
+        
+        // Clear timer reference
+        arrowKeyDebounceTimer.current = null;
+        
+        // Return unchanged - we're just reading current state
+        return currentShapes;
+      });
+    }, 100);
+  }, [selectedShapeIds, canvasId, currentUser]);
+
+  // Z-index handler functions (layer management)
+  const handleBringToFront = useCallback(() => {
+    if (selectedShapeIds.length !== 1 || !canvasId || !currentUser) return;
+    
+    const shapeId = selectedShapeIds[0];
+    const shape = shapes.find(s => s.id === shapeId);
+    if (!shape) return;
+    
+    const maxZ = getMaxZIndex(shapes);
+    const newZIndex = maxZ + 1;
+    
+    // Optimistic update with version increment and pending update tracking
+    setShapes(prevShapes =>
+      prevShapes.map(s => {
+        if (s.id === shapeId) {
+          const updatedShape = {
+            ...s,
+            zIndex: newZIndex,
+            updatedAt: new Date(),
+            version: s.version + 1,
+            lastEditedBy: currentUser.id,
+          };
+          
+          // Register pending update so Firebase listener doesn't overwrite
+          pendingUpdates.current.set(s.id, updatedShape.version);
+          
+          return updatedShape;
+        }
+        return s;
+      })
+    );
+    
+    // Sync to Firebase with version for conflict detection
+    updateShapeInFirebase(canvasId, shapeId, { zIndex: newZIndex }, currentUser.id, shape.version)
+      .catch(error => {
+        console.error('Failed to update z-index:', error);
+        showError('Failed to update layer. Please try again.');
+        // Clear pending update on error
+        pendingUpdates.current.delete(shapeId);
+      });
+  }, [selectedShapeIds, shapes, canvasId, currentUser, showError]);
+
+  const handleSendToBack = useCallback(() => {
+    if (selectedShapeIds.length !== 1 || !canvasId || !currentUser) return;
+    
+    const shapeId = selectedShapeIds[0];
+    const shape = shapes.find(s => s.id === shapeId);
+    if (!shape) return;
+    
+    const minZ = getMinZIndex(shapes);
+    
+    // Optimistic update with version increment and pending update tracking
+    setShapes(prevShapes =>
+      prevShapes.map(s => {
+        if (s.id === shapeId) {
+          const updatedShape = {
+            ...s,
+            zIndex: minZ - 1,
+            updatedAt: new Date(),
+            version: s.version + 1,
+            lastEditedBy: currentUser.id,
+          };
+          
+          // Register pending update so Firebase listener doesn't overwrite
+          pendingUpdates.current.set(s.id, updatedShape.version);
+          
+          return updatedShape;
+        }
+        return s;
+      })
+    );
+    
+    // Sync to Firebase with version for conflict detection
+    updateShapeInFirebase(canvasId, shapeId, { zIndex: minZ - 1 }, currentUser.id, shape.version)
+      .catch(error => {
+        console.error('Failed to update z-index:', error);
+        showError('Failed to update layer. Please try again.');
+        // Clear pending update on error
+        pendingUpdates.current.delete(shapeId);
+      });
+  }, [selectedShapeIds, shapes, canvasId, currentUser, showError]);
+
+
+  // Keyboard shortcuts setup
+  useKeyboardShortcuts([
+    // ESC: Clear selection, close panels, cancel modes
+    {
+      key: 'Escape',
+      handler: handleEscape,
+      preventDefault: true,
+    },
+    // Delete/Backspace: Remove selected shapes
+    {
+      key: 'Delete',
+      handler: handleDeleteShapes,
+      preventDefault: true,
+    },
+    {
+      key: 'Backspace',
+      handler: handleDeleteShapes,
+      preventDefault: true,
+    },
+    // Cmd+C: Copy selected shapes
+    {
+      key: 'c',
+      meta: true,
+      handler: handleCopy,
+      preventDefault: false, // Allow browser copy for text inputs
+    },
+    // Cmd+V: Paste shapes
+    {
+      key: 'v',
+      meta: true,
+      handler: handlePaste,
+      preventDefault: false, // Allow browser paste for text inputs
+    },
+    // Cmd+X: Cut selected shapes
+    {
+      key: 'x',
+      meta: true,
+      handler: handleCut,
+      preventDefault: false, // Allow browser cut for text inputs
+    },
+    // Cmd+D: Duplicate selected shapes
+    {
+      key: 'd',
+      meta: true,
+      handler: handleDuplicate,
+      preventDefault: true, // Prevent browser bookmark dialog
+    },
+    // Arrow keys: Move shapes 10px
+    {
+      key: 'ArrowUp',
+      handler: () => handleArrowKeyMove('up'),
+      preventDefault: true,
+    },
+    {
+      key: 'ArrowDown',
+      handler: () => handleArrowKeyMove('down'),
+      preventDefault: true,
+    },
+    {
+      key: 'ArrowLeft',
+      handler: () => handleArrowKeyMove('left'),
+      preventDefault: true,
+    },
+    {
+      key: 'ArrowRight',
+      handler: () => handleArrowKeyMove('right'),
+      preventDefault: true,
+    },
+  ]);
 
   // Real-time sync: Subscribe to Firestore changes for this canvas
   // Smart merge to prevent unnecessary re-renders and flickering
@@ -261,11 +684,26 @@ export const Canvas: React.FC = () => {
           return null; // Will be filtered out
         }
         
-        // Skip update for shape currently being dragged
+        // Skip update for shapes currently being dragged (single or group)
         // This prevents flicker during drag by letting Konva manage the position
-        if (draggingShapeIdRef.current === prevShape.id) {
+        if (groupDragStartPositions.current.has(prevShape.id)) {
           syncedMap.delete(prevShape.id);
           return prevShape;
+        }
+        
+        // Skip update for shapes with pending Firebase writes
+        // Wait until Firebase confirms the write (version >= expected)
+        const expectedVersion = pendingUpdates.current.get(prevShape.id);
+        if (expectedVersion !== undefined) {
+          if (syncedShape.version >= expectedVersion) {
+            // Firebase write confirmed! Remove from pending
+            pendingUpdates.current.delete(prevShape.id);
+            // Allow the update to proceed
+          } else {
+            // Still waiting for Firebase write to complete
+            syncedMap.delete(prevShape.id);
+            return prevShape;
+          }
         }
         
         // Deep comparison - only update if actually different
@@ -275,6 +713,7 @@ export const Canvas: React.FC = () => {
           prevShape.width !== syncedShape.width ||
           prevShape.height !== syncedShape.height ||
           prevShape.fill !== syncedShape.fill ||
+          prevShape.zIndex !== syncedShape.zIndex ||
           prevShape.version !== syncedShape.version
         ) {
           hasChanges = true;
@@ -548,10 +987,13 @@ export const Canvas: React.FC = () => {
       createdBy: currentUser.id,
     };
 
+    // Generate unique ID client-side for optimistic update
+    const shapeId = generateUniqueId();
+
     // Optimistic update: Add to local state immediately
     const optimisticShape: CanvasObject = {
       ...shapeData,
-      id: generateUniqueId(),
+      id: shapeId,
       createdAt: new Date(),
       updatedAt: new Date(),
       version: 1, // Initial version
@@ -560,15 +1002,15 @@ export const Canvas: React.FC = () => {
     
     setShapes(prevShapes => [...prevShapes, optimisticShape]);
     
-    // Write to Firebase in background
+    // Write to Firebase in background with same ID
     try {
-      await createShapeInFirebase(canvasId, shapeData);
-      // Firestore listener will update with the actual shape from server
+      await createShapeInFirebase(canvasId, shapeData, shapeId);
+      // Firestore listener will sync the confirmed shape from server
     } catch (error) {
       console.error('Failed to create shape in Firebase:', error);
       showError('Failed to create shape. Please try again.');
       // Revert optimistic update on error
-      setShapes(prevShapes => prevShapes.filter(s => s.id !== optimisticShape.id));
+      setShapes(prevShapes => prevShapes.filter(s => s.id !== shapeId));
     }
   };
 
@@ -594,6 +1036,8 @@ export const Canvas: React.FC = () => {
     const wasAlreadySelected = isSelected(id);
     const isGroupDragStart = wasAlreadySelected && selectedShapeIds.length > 1;
     
+    const shape = shapes.find(s => s.id === id);
+    
     // Ensure the shape is selected when drag starts (if not already)
     if (!wasAlreadySelected) {
       setSelectedShapeIds([id]);
@@ -615,7 +1059,6 @@ export const Canvas: React.FC = () => {
       });
     } else {
       // Single drag: store just this shape
-      const shape = shapes.find(s => s.id === id);
       if (shape) {
         positions.set(id, { x: shape.x, y: shape.y });
       }
@@ -630,6 +1073,7 @@ export const Canvas: React.FC = () => {
 
   const handleShapeDragMove = (id: string, x: number, y: number) => {
     const startPos = groupDragStartPositions.current.get(id);
+    
     if (!startPos) return;
     
     // Calculate delta from original position
@@ -657,10 +1101,18 @@ export const Canvas: React.FC = () => {
   const handleShapeDragEnd = async (id: string, x: number, y: number) => {
     if (!canvasId || !currentUser) return;
 
-    // Store original shape for rollback
-    const originalShape = shapes.find(shape => shape.id === id);
+    // Get the ORIGINAL position from before drag started (not current state!)
+    const startPos = groupDragStartPositions.current.get(id);
+    if (!startPos) {
+      draggingShapeIdRef.current = null;
+      groupDragStartPositions.current.clear();
+      return;
+    }
+
+    // Store shape for version checking
+    const shape = shapes.find(s => s.id === id);
     
-    if (!originalShape) {
+    if (!shape) {
       draggingShapeIdRef.current = null;
       groupDragStartPositions.current.clear();
       return;
@@ -670,9 +1122,9 @@ export const Canvas: React.FC = () => {
     const roundedX = Math.round(x);
     const roundedY = Math.round(y);
 
-    // Calculate delta movement
-    const deltaX = roundedX - Math.round(originalShape.x);
-    const deltaY = roundedY - Math.round(originalShape.y);
+    // Calculate delta movement from ORIGINAL start position
+    const deltaX = roundedX - Math.round(startPos.x);
+    const deltaY = roundedY - Math.round(startPos.y);
 
     // Skip update if position hasn't actually changed
     if (deltaX === 0 && deltaY === 0) {
@@ -696,7 +1148,7 @@ export const Canvas: React.FC = () => {
           const newX = startPos ? Math.round(startPos.x + deltaX) : (shape.id === id ? roundedX : shape.x);
           const newY = startPos ? Math.round(startPos.y + deltaY) : (shape.id === id ? roundedY : shape.y);
           
-          return { 
+          const updatedShape = { 
             ...shape, 
             x: newX, 
             y: newY, 
@@ -704,12 +1156,18 @@ export const Canvas: React.FC = () => {
             version: shape.version + 1, // Increment version optimistically
             lastEditedBy: currentUser.id, // Track who edited
           };
+          
+          // Register this shape as having a pending Firebase write
+          // The listener will only accept updates with version >= this
+          pendingUpdates.current.set(shape.id, updatedShape.version);
+          
+          return updatedShape;
         }
         return shape; // Keep same reference for unchanged shapes
       })
     );
 
-    // Clear dragging state to allow Firebase updates again
+    // Clear drag refs immediately
     draggingShapeIdRef.current = null;
     groupDragStartPositions.current.clear();
 
@@ -752,11 +1210,19 @@ export const Canvas: React.FC = () => {
           id, 
           { x: roundedX, y: roundedY }, 
           currentUser.id,
-          originalShape.version
+          shape.version
         );
       }
-      // Firestore listener will confirm the update
+      
+      // Note: pendingUpdates will be cleared automatically by handleShapesUpdate
+      // when Firebase listener confirms the write (version >= expected)
+      
     } catch (error) {
+      // Clear pending updates on error so shapes can receive Firebase updates again
+      shapesToUpdate.forEach(shapeId => {
+        pendingUpdates.current.delete(shapeId);
+      });
+      
       // Handle conflict errors specifically
       if (error instanceof ConflictError) {
         console.warn('Conflict detected:', error);
@@ -926,15 +1392,23 @@ export const Canvas: React.FC = () => {
       return isVisible;
     });
 
+    // Sort shapes by zIndex (lowest to highest) so they render in correct layering order
+    // Create new array to ensure React detects the change
+    const sorted = [...visible].sort((a, b) => {
+      const aZ = a.zIndex ?? 0;
+      const bZ = b.zIndex ?? 0;
+      return aZ - bZ; // Ascending order: lower zIndex renders first (bottom)
+    });
+
     // Log virtualization stats (can be removed in production)
     if (shapes.length > 50) {
       console.log(
-        `[Virtualization] Rendering ${visible.length}/${shapes.length} shapes ` +
-        `(${Math.round((visible.length / shapes.length) * 100)}% visible)`
+        `[Virtualization] Rendering ${sorted.length}/${shapes.length} shapes ` +
+        `(${Math.round((sorted.length / shapes.length) * 100)}% visible)`
       );
     }
 
-    return visible;
+    return sorted;
   }, [shapes, stageScale, stageX, stageY, stageWidth, stageHeight, isSelected]);
 
   if (loading) {
@@ -1109,6 +1583,51 @@ export const Canvas: React.FC = () => {
         stageScale={stageScale}
         headerHeight={0}
       />
+
+      {/* Shape Edit Bar - Only show when exactly 1 shape is selected */}
+      {selectedShapeIds.length === 1 && (() => {
+        const selectedShape = shapes.find(s => s.id === selectedShapeIds[0]);
+        if (!selectedShape) return null;
+
+        const handleShapeUpdate = (updates: Partial<CanvasObject>) => {
+          if (!canvasId || !currentUser) return;
+
+          // Optimistic update (live preview during color picker dragging)
+          setShapes(prevShapes =>
+            prevShapes.map(shape =>
+              shape.id === selectedShape.id
+                ? { ...shape, ...updates, updatedAt: new Date() }
+                : shape
+            )
+          );
+
+          // Sync to Firebase
+          updateShapeInFirebase(canvasId, selectedShape.id, updates, currentUser.id)
+            .catch(error => {
+              console.error('Failed to update shape:', error);
+              showError('Failed to update shape. Please try again.');
+            });
+        };
+
+        // Called when user commits a color (closes popover or clicks swatch)
+        const handleColorCommit = (color: string) => {
+          addRecentColor(color);
+        };
+
+        return (
+          <ShapeEditBar
+            shape={selectedShape}
+            stageScale={stageScale}
+            stageX={stageX}
+            stageY={stageY}
+            onUpdate={handleShapeUpdate}
+            onColorCommit={handleColorCommit}
+            onBringToFront={handleBringToFront}
+            onSendToBack={handleSendToBack}
+            recentColors={recentColors}
+          />
+        );
+      })()}
 
       {/* Share Modal */}
       <ShareLinkModal

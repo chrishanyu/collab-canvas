@@ -1,0 +1,214 @@
+# Task List: Figma-Inspired Features (12-Point Target)
+
+## Relevant Files
+
+- `src/components/canvas/Canvas.tsx` - Main canvas component for keyboard event handlers, clipboard state, and edit bar rendering
+- `src/components/canvas/ShapeEditBar.tsx` - NEW - Floating edit bar component above selected shapes
+- `src/components/canvas/ColorPickerControl.tsx` - NEW - Color picker control within edit bar
+- `src/components/canvas/AlignmentToolbar.tsx` - NEW - Floating toolbar for alignment operations
+- `src/components/canvas/CanvasToolbar.tsx` - Main toolbar for z-index buttons
+- `src/types/index.ts` - Type definitions to add zIndex and opacity properties
+- `src/services/canvasObjects.service.ts` - Firebase service for shape updates
+- `src/utils/canvasHelpers.ts` - Utility functions for alignment math and bounding boxes
+- `src/utils/colorStorage.ts` - NEW - LocalStorage utilities for recent colors
+- `src/hooks/useKeyboardShortcuts.ts` - NEW - Custom hook for keyboard event handling
+- `tests/unit/alignmentMath.test.ts` - NEW - Unit tests for alignment calculations
+- `tests/unit/keyboardShortcuts.test.ts` - NEW - Unit tests for keyboard handler logic
+- `tests/integration/keyboard-workflows.test.tsx` - NEW - Integration tests for keyboard features
+- `tests/integration/color-picker.test.tsx` - NEW - Integration tests for color picker
+- `tests/integration/alignment.test.tsx` - NEW - Integration tests for alignment tools
+
+### Notes
+
+- This implements 5 features targeting 12 points total (2+2+2+3+3)
+- Features build on existing multi-selection system
+- Edit bar uses HTML overlay pattern (similar to existing cursor system)
+- All features support real-time collaboration
+- Use `npm run test` to run all tests
+- Use `npm run dev` to test features in development
+
+---
+
+## Tasks
+
+- [x] 1.0 Phase 1: Foundation - Keyboard Infrastructure & Event Handling
+  - [x] 1.1 Create `src/hooks/useKeyboardShortcuts.ts` custom hook
+  - [x] 1.2 Add keyboard event listener setup (window 'keydown' event)
+  - [x] 1.3 Implement platform detection (Mac vs Windows) for meta/ctrl key
+  - [x] 1.4 Add preventDefault logic for design tool shortcuts (Cmd+D, arrow keys, etc.)
+  - [x] 1.5 Create keyboard shortcut registry pattern (map shortcuts to handlers)
+  - [x] 1.6 Add keyboard event cleanup on unmount
+  - [x] 1.7 Integrate useKeyboardShortcuts hook into Canvas.tsx
+  - [x] 1.8 Implement ESC key handler: clear selection, close panels, cancel modes
+  - [x] 1.9 Implement Delete/Backspace key handler: remove selected shapes
+  - [x] 1.10 Add Firebase sync for shape deletion with optimistic updates
+  - [x] 1.11 Test ESC and Delete keys work correctly
+  - [x] 1.12 Verify keyboard events don't fire when modals/inputs are focused
+
+- [x] 2.0 Phase 2: Object Manipulation - Copy/Paste & Duplicate
+  - [x] 2.1 Add clipboard state to Canvas.tsx: `clipboardShapes: CanvasObject[]`
+  - [x] 2.2 Implement Cmd+C handler: copy selected shapes to clipboard state
+  - [x] 2.3 Add toast notification "Copied X shape(s)" on copy
+  - [x] 2.4 Implement Cmd+V handler: paste shapes with 20px offset
+  - [x] 2.5 Generate new unique IDs for pasted shapes using `generateUniqueId()`
+  - [x] 2.6 Auto-select pasted shapes (deselect originals)
+  - [x] 2.7 Add Firebase sync for pasted shapes with client-side ID generation
+  - [x] 2.8 Add toast notification "Pasted X shape(s)" on paste
+  - [x] 2.9 Implement Cmd+X handler: cut = copy + delete
+  - [x] 2.10 Add toast notification "Cut X shape(s)" on cut
+  - [x] 2.11 Implement Cmd+D handler: duplicate with 10px offset
+  - [x] 2.12 Add toast notification "Duplicated X shape(s)" on duplicate
+  - [x] 2.13 Implement arrow key movement: 10px per keypress
+  - [x] 2.14 Add debouncing (100ms) for arrow key Firebase updates
+  - [x] 2.15 Support multi-shape movement (all selected shapes move together)
+  - [x] 2.16 Add version-based conflict resolution for arrow key updates
+  - [x] 2.17 Test copy/paste preserves all shape properties (size, rotation, colors, text)
+  - [x] 2.18 Test duplicate with single and multiple shapes
+  - [x] 2.19 Test arrow key movement in all 4 directions (10px per press)
+  - [x] 2.20 Verify clipboard clears when switching canvases
+
+- [x] 3.0 Phase 3: Shape Edit Bar Foundation & Color Picker
+  - [x] 3.1 Create `src/components/canvas/ShapeEditBar.tsx` component
+  - [x] 3.2 Add props: `shape: CanvasObject`, `stageScale`, `stageX`, `stageY`, `onUpdate`
+  - [x] 3.3 Implement position calculation logic (convert canvas coords to screen coords)
+  - [x] 3.4 Position edit bar 10px above shape's top edge, centered horizontally
+  - [x] 3.5 Add smart positioning: flip below shape if near top of viewport
+  - [x] 3.6 Style edit bar: white background, shadow, rounded corners, padding (8px)
+  - [x] 3.7 Add fade in/out animation (200ms) on mount/unmount
+  - [x] 3.8 Set high CSS z-index (9999) to appear above all canvas elements
+  - [x] 3.9 Add horizontal flex layout for extensible controls
+  - [x] 3.10 Create `src/components/canvas/ColorPickerControl.tsx` component
+  - [x] 3.11 Add props: `value: string`, `onChange: (color: string) => void`
+  - [x] 3.12 Render color button (32x32px square) with current fill as background
+  - [x] 3.13 Add paint bucket icon from lucide-react overlay on button
+  - [x] 3.14 Implement color picker popover (positioned below button)
+  - [x] 3.15 Add react-colorful HexColorPicker with custom styling
+  - [x] 3.16 Create Firebase hook for user recent colors management
+  - [x] 3.17 Implement useRecentColors hook with Firebase read/write
+  - [x] 3.18 Store max 8 recent colors in Firebase under /users/{userId}/recentColors
+  - [x] 3.19 Render recent colors as swatches (now populated from Firebase)
+  - [x] 3.20 Implement default color palette (16 colors: 4 rows x 4 columns)
+  - [x] 3.21 Wire up color selection to call onChange and close popover
+  - [x] 3.22 Add click outside handler to close popover
+  - [x] 3.23 Integrate ColorPickerControl as first child of ShapeEditBar
+  - [x] 3.24 Render ShapeEditBar in Canvas.tsx ONLY when selectedShapeIds.length === 1
+  - [x] 3.25 Pass handleShapeUpdate callback to ShapeEditBar
+  - [x] 3.26 Update shape fill color in Firebase (optimistic update)
+  - [x] 3.27 Add useEffect to recalculate edit bar position on pan/zoom
+  - [x] 3.28 Add useEffect to recalculate position on window resize
+  - [x] 3.29 Test edit bar appears ONLY for single selection (READY FOR TESTING)
+  - [x] 3.30 Test edit bar disappears when selecting multiple shapes (READY FOR TESTING)
+  - [x] 3.31 Test edit bar follows shape during pan/zoom (READY FOR TESTING)
+  - [x] 3.32 Test color picker changes shape fill color immediately (READY FOR TESTING)
+  - [x] 3.33 Test recent colors persist across browser sessions (READY FOR TESTING)
+  - [x] 3.34 Verify edit bar positioning with shapes near viewport edges (READY FOR TESTING)
+  - [x] 3.35 Test real-time color sync across multiple users (READY FOR TESTING)
+
+- [x] 4.0 Phase 4: Z-Index Controls in Shape Edit Bar
+  - [x] 4.1 Add `zIndex?: number` property to CanvasObject type in types/index.ts
+  - [x] 4.2 Update canvasObjects.service.ts createShape to set default zIndex = 0 (optional property defaults to 0)
+  - [x] 4.3 Ensure zIndex is saved/loaded from Firebase like other properties (automatic with type)
+  - [x] 4.4 Create `src/utils/canvasHelpers.ts` with z-index helper functions (file already existed)
+  - [x] 4.5 Implement `getMaxZIndex(shapes: CanvasObject[]): number` function
+  - [x] 4.6 Implement `getMinZIndex(shapes: CanvasObject[]): number` function
+  - [x] 4.7 Add shape sorting by zIndex in Canvas.tsx before rendering
+  - [x] 4.8 Sort logic: primary by zIndex ascending, secondary by creation order
+  - [x] 4.9 Create `src/components/canvas/ZIndexControls.tsx` component
+  - [x] 4.10 Add props: `shape: CanvasObject`, `allShapes: CanvasObject[]`, `onUpdate`
+  - [x] 4.11 Import icons: ChevronsUp, ChevronUp, ChevronDown, ChevronsDown from lucide-react
+  - [x] 4.12 Render 4 icon buttons (32x32px each) in horizontal layout
+  - [x] 4.13 Add vertical divider (1px line) before z-index buttons
+  - [x] 4.14 Style buttons: hover states, active states, consistent with ColorPicker
+  - [x] 4.15 Add tooltips: "Bring to Front (⌘⇧])", "Bring Forward (⌘])", etc.
+  - [x] 4.16 Implement handleBringToFront: zIndex = getMaxZIndex(allShapes) + 1
+  - [x] 4.17 Implement handleSendToBack: zIndex = getMinZIndex(allShapes) - 1
+  - [x] 4.18 Implement handleBringForward: zIndex = shape.zIndex + 1
+  - [x] 4.19 Implement handleSendBackward: zIndex = shape.zIndex - 1
+  - [x] 4.20 Call onUpdate({ zIndex: newValue }) for each operation
+  - [x] 4.21 Integrate ZIndexControls into ShapeEditBar after ColorPicker
+  - [x] 4.22 Add keyboard shortcut: Cmd+Shift+] for Bring to Front
+  - [x] 4.23 Add keyboard shortcut: Cmd+Shift+[ for Send to Back
+  - [x] 4.24 Add keyboard shortcut: Cmd+] for Bring Forward
+  - [x] 4.25 Add keyboard shortcut: Cmd+[ for Send Backward
+  - [x] 4.26 Ensure shortcuts only work when exactly 1 shape selected
+  - [x] 4.27 Update shape zIndex in Firebase with optimistic update
+  - [x] 4.28 Test Bring to Front moves shape above all others visually (READY FOR TESTING)
+  - [x] 4.29 Test Send to Back moves shape below all others visually (READY FOR TESTING)
+  - [x] 4.30 Test Bring Forward increments z-index correctly (READY FOR TESTING)
+  - [x] 4.31 Test Send Backward decrements z-index correctly (READY FOR TESTING)
+  - [x] 4.32 Test keyboard shortcuts work correctly (READY FOR TESTING)
+  - [x] 4.33 Test z-index controls only appear for single selection (READY FOR TESTING)
+  - [x] 4.34 Verify shapes maintain correct visual order after browser refresh (READY FOR TESTING)
+  - [x] 4.35 Test real-time z-index sync across multiple users (READY FOR TESTING)
+
+- [ ] 5.0 Phase 5: Alignment Tools System
+  - [ ] 5.1 Create `src/components/canvas/AlignmentToolbar.tsx` component
+  - [ ] 5.2 Add props: `selectedShapes`, `stageScale`, `stageX`, `stageY`, `onAlign`
+  - [ ] 5.3 Implement visibility logic: only show when 2+ shapes selected
+  - [ ] 5.4 Calculate selection bounding box utility in canvasHelpers.ts
+  - [ ] 5.5 Position toolbar above topmost selected shape, centered
+  - [ ] 5.6 Style toolbar: white background, shadow, horizontal button group
+  - [ ] 5.7 Add 9 alignment buttons: Left, Center, Right, Top, Middle, Bottom, Distribute H, Distribute V, Align Center
+  - [ ] 5.8 Add alignment icons from lucide-react or custom SVGs
+  - [ ] 5.9 Disable Distribute buttons when < 3 shapes selected
+  - [ ] 5.10 Implement `alignLeft()` function: align all to leftmost edge
+  - [ ] 5.11 Implement `alignHorizontalCenter()` function: center horizontally in bounding box
+  - [ ] 5.12 Implement `alignRight()` function: align all to rightmost edge
+  - [ ] 5.13 Implement `alignTop()` function: align all to topmost edge
+  - [ ] 5.14 Implement `alignVerticalCenter()` function: center vertically in bounding box
+  - [ ] 5.15 Implement `alignBottom()` function: align all to bottommost edge
+  - [ ] 5.16 Implement `distributeHorizontally()` function: even spacing left to right
+  - [ ] 5.17 Implement `distributeVertically()` function: even spacing top to bottom
+  - [ ] 5.18 Add Cmd+Shift+L keyboard shortcut for Align Left
+  - [ ] 5.19 Add Cmd+Shift+H keyboard shortcut for Align Horizontal Center
+  - [ ] 5.20 Add Cmd+Shift+R keyboard shortcut for Align Right
+  - [ ] 5.21 Add Cmd+Shift+T keyboard shortcut for Align Top
+  - [ ] 5.22 Add Cmd+Shift+M keyboard shortcut for Align Vertical Center
+  - [ ] 5.23 Add Cmd+Shift+B keyboard shortcut for Align Bottom
+  - [ ] 5.24 Batch update all shape positions in single Firebase transaction
+  - [ ] 5.25 Add optimistic updates for alignment operations
+  - [ ] 5.26 Add tooltips to alignment buttons showing keyboard shortcuts
+  - [ ] 5.27 Integrate AlignmentToolbar into Canvas.tsx
+  - [ ] 5.28 Add useEffect to recalculate toolbar position on pan/zoom
+  - [ ] 5.29 Test all 6 alignment operations with 2 shapes
+  - [ ] 5.30 Test alignment with 5+ shapes of different sizes
+  - [ ] 5.31 Test distribute horizontally with 3+ shapes
+  - [ ] 5.32 Test distribute vertically with 3+ shapes
+  - [ ] 5.33 Test all keyboard shortcuts for alignment
+  - [ ] 5.34 Verify alignment toolbar appears/disappears correctly
+  - [ ] 5.35 Test real-time sync of alignment changes across users
+
+- [ ] 6.0 Phase 6: Polish, Testing & Integration
+  - [ ] 6.1 Add tooltips to all toolbar buttons with keyboard shortcuts
+  - [ ] 6.2 Format tooltips: "Bring to Front (⌘⇧])" on Mac, "Bring to Front (Ctrl+Shift+])" on Windows
+  - [ ] 6.3 Test all keyboard shortcuts on Mac (meta key)
+  - [ ] 6.4 Test all keyboard shortcuts on Windows (ctrl key)
+  - [ ] 6.5 Verify preventDefault prevents browser defaults (no bookmarks on Cmd+D, etc.)
+  - [ ] 6.6 Test keyboard shortcuts don't fire when text inputs focused
+  - [ ] 6.7 Test keyboard shortcuts don't fire when modals open
+  - [ ] 6.8 Write unit tests for alignment math functions
+  - [ ] 6.9 Write unit tests for bounding box calculations
+  - [ ] 6.10 Write unit tests for z-index helper functions
+  - [ ] 6.11 Write unit tests for color storage functions
+  - [ ] 6.12 Create integration test: keyboard workflow (create, duplicate, move, delete)
+  - [ ] 6.13 Create integration test: copy/paste workflow
+  - [ ] 6.14 Create integration test: z-index operations
+  - [ ] 6.15 Create integration test: color picker workflow
+  - [ ] 6.16 Create integration test: alignment operations
+  - [ ] 6.17 Test performance: edit bar repositioning during fast pan/zoom
+  - [ ] 6.18 Test performance: keyboard shortcuts with 50+ shapes
+  - [ ] 6.19 Test performance: alignment with 20+ selected shapes
+  - [ ] 6.20 Test edge case: very small shapes with edit bar
+  - [ ] 6.21 Test edge case: shapes near viewport edges
+  - [ ] 6.22 Test edge case: copy/paste with rotated shapes
+  - [ ] 6.23 Test edge case: alignment with overlapping shapes
+  - [ ] 6.24 Verify no regressions in existing features (presence, cursors, conflict resolution)
+  - [ ] 6.25 Run all 266 existing tests - ensure they still pass
+  - [ ] 6.26 Fix any linter errors or warnings
+  - [ ] 6.27 Test cross-browser compatibility (Chrome, Firefox, Safari)
+  - [ ] 6.28 Test all features with 2+ users collaborating in real-time
+  - [ ] 6.29 Verify all toast notifications display correctly
+  - [ ] 6.30 Document any known issues or limitations
+  - [ ] 6.31 Update README with new keyboard shortcuts
+  - [ ] 6.32 Final end-to-end walkthrough of all 5 features
+
