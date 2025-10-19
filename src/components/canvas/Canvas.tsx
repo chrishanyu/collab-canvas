@@ -25,6 +25,7 @@ import { TransformHandles } from './TransformHandles';
 import { GridDots } from './GridDots';
 import { UserPresence } from '../presence/UserPresence';
 import { ShapeEditBar } from './ShapeEditBar';
+import { AICommandInput } from '../ai/AICommandInput';
 import { constrainZoom, getRelativePointerPosition, generateUniqueId, getMaxZIndex, getMinZIndex } from '../../utils/canvasHelpers';
 import type { Canvas as CanvasType, CanvasObject, ShapeType } from '../../types';
 import { ConflictError } from '../../types';
@@ -1628,6 +1629,33 @@ export const Canvas: React.FC = () => {
           />
         );
       })()}
+
+      {/* AI Command Input */}
+      {currentUser && canvasId && (
+        <AICommandInput
+          canvasId={canvasId}
+          userId={currentUser.id}
+          userName={currentUser.displayName}
+          canvasState={{
+            shapes: shapes.map(shape => ({
+              id: shape.id,
+              type: shape.type,
+              x: shape.x,
+              y: shape.y,
+              width: shape.width,
+              height: shape.height,
+              fill: shape.fill,
+              text: shape.text,
+            })),
+            selectedShapeIds,
+            viewport: {
+              x: stageX,
+              y: stageY,
+              scale: stageScale,
+            },
+          }}
+        />
+      )}
 
       {/* Share Modal */}
       <ShareLinkModal
