@@ -55,9 +55,8 @@ async function verifyAuthToken(authHeader: string | undefined): Promise<{ valid:
     return { valid: false };
   }
 
-  const token = authHeader.substring(7);
-  
-  // TODO: In production, verify with Firebase Admin SDK
+  // TODO: In production, verify token with Firebase Admin SDK
+  // const token = authHeader.substring(7);
   // const admin = require('firebase-admin');
   // const decodedToken = await admin.auth().verifyIdToken(token);
   // return { valid: true, userId: decodedToken.uid };
@@ -137,7 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 5. Parse function calls
-    const functionCalls: Array<{ name: string; arguments: Record<string, any> }> = [];
+    const functionCalls: Array<{ name: string; arguments: Record<string, unknown> }> = [];
 
     if (responseMessage.function_call) {
       try {
@@ -169,27 +168,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       executionTime,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('AI Command Error:', error);
 
     // Handle OpenAI API errors
-    if (error.status === 429) {
+    const err = error as { status?: number; code?: string; message?: string };
+    if (err.status === 429) {
       return res.status(429).json({ error: 'AI service is busy. Please try again in a moment.' });
     }
 
-    if (error.status === 401) {
+    if (err.status === 401) {
       return res.status(500).json({ error: 'AI service configuration error' });
     }
 
     // Handle timeout
-    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+    if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
       return res.status(504).json({ error: 'AI service timeout. Please try again.' });
     }
 
     // Generic error
     return res.status(500).json({ 
       error: 'An error occurred processing your command',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 }
