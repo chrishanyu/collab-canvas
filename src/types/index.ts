@@ -28,6 +28,16 @@ export interface CanvasObject {
   width: number;
   height: number;
   fill: string;
+  stroke?: string; // Border color
+  strokeWidth?: number; // Border width in pixels
+  rotation?: number; // Rotation angle in degrees
+  text?: string; // Text content for text labels on shapes
+  textFormat?: {
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    fontSize?: number;
+  };
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;

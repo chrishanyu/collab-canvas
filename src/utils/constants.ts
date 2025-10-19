@@ -38,3 +38,11 @@ export const DEFAULT_ZOOM = 1;
 export const DEFAULT_CANVAS_X = 0;
 export const DEFAULT_CANVAS_Y = 0;
 
+/**
+ * Default shape styling
+ * Applied to all newly created shapes for a clean, professional look
+ */
+export const DEFAULT_SHAPE_FILL = '#FFFFFF'; // White fill
+export const DEFAULT_SHAPE_STROKE = '#1F2937'; // Gray-800 border
+export const DEFAULT_SHAPE_STROKE_WIDTH = 2; // 2px border
+

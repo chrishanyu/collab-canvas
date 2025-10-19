@@ -71,6 +71,11 @@ export function subscribeToCanvasObjects(
             width: data.width,
             height: data.height,
             fill: data.fill,
+            stroke: data.stroke,
+            strokeWidth: data.strokeWidth,
+            rotation: data.rotation,
+            text: data.text,
+            textFormat: data.textFormat,
             createdBy: data.createdBy,
             createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
             updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
@@ -119,6 +124,11 @@ export async function getCanvasObjects(canvasId: string): Promise<CanvasObject[]
         width: data.width,
         height: data.height,
         fill: data.fill,
+        stroke: data.stroke,
+        strokeWidth: data.strokeWidth,
+        rotation: data.rotation,
+        text: data.text,
+        textFormat: data.textFormat,
         createdBy: data.createdBy,
         createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
         updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
@@ -151,7 +161,8 @@ export async function createShape(
     const shapeId = shapeRef.id;
     
     // Shape data with timestamps and version tracking
-    const shapeData = {
+    // Filter out undefined values (Firebase doesn't accept undefined)
+    const shapeData: Record<string, unknown> = {
       id: shapeId,
       type: shape.type,
       x: shape.x,
@@ -166,15 +177,38 @@ export async function createShape(
       lastEditedBy: shape.createdBy, // Set to creator initially
     };
     
+    // Only include optional properties if they are defined
+    if (shape.stroke !== undefined) shapeData.stroke = shape.stroke;
+    if (shape.strokeWidth !== undefined) shapeData.strokeWidth = shape.strokeWidth;
+    if (shape.rotation !== undefined) shapeData.rotation = shape.rotation;
+    if (shape.text !== undefined) shapeData.text = shape.text;
+    if (shape.textFormat !== undefined) shapeData.textFormat = shape.textFormat;
+    
     // Create shape document
     await setDoc(shapeRef, shapeData);
     
     // Return shape with Date objects (serverTimestamp will be resolved)
-    return {
-      ...shapeData,
+    const createdShape: CanvasObject = {
+      id: shapeId,
+      type: shape.type,
+      x: shape.x,
+      y: shape.y,
+      width: shape.width,
+      height: shape.height,
+      fill: shape.fill,
+      stroke: shape.stroke,
+      strokeWidth: shape.strokeWidth,
+      rotation: shape.rotation,
+      text: shape.text,
+      textFormat: shape.textFormat,
+      createdBy: shape.createdBy,
       createdAt: new Date(),
       updatedAt: new Date(),
+      version: 1,
+      lastEditedBy: shape.createdBy,
     };
+    
+    return createdShape;
   } catch (error) {
     console.error('Error creating shape:', error);
     throw new Error('Failed to create shape');

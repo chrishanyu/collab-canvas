@@ -6,8 +6,9 @@ import Konva from 'konva';
 interface ShapeProps {
   shape: CanvasObject;
   isSelected: boolean;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, event?: Konva.KonvaEventObject<MouseEvent>) => void;
   onDragStart: (id: string) => void;
+  onDragMove: (id: string, x: number, y: number) => void;
   onDragEnd: (id: string, x: number, y: number) => void;
   isBeingEdited?: boolean;
   editorName?: string;
@@ -28,7 +29,8 @@ export const Shape = React.memo(({
   shape, 
   isSelected, 
   onSelect, 
-  onDragStart, 
+  onDragStart,
+  onDragMove,
   onDragEnd,
   isBeingEdited = false,
   editorName,
@@ -38,6 +40,20 @@ export const Shape = React.memo(({
 
   const handleDragStart = () => {
     onDragStart(shape.id);
+  };
+
+  const handleDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    const node = e.target;
+    let currentX = node.x();
+    let currentY = node.y();
+    
+    // For center-based shapes, convert center position back to top-left equivalent
+    if (shape.type !== 'rectangle') {
+      currentX = node.x() - shape.width / 2;
+      currentY = node.y() - shape.height / 2;
+    }
+    
+    onDragMove(shape.id, currentX, currentY);
   };
 
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -55,19 +71,19 @@ export const Shape = React.memo(({
     onDragEnd(shape.id, finalX, finalY);
   };
 
-  const handleClick = () => {
-    onSelect(shape.id);
+  const handleClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    onSelect(shape.id, e);
   };
 
   // Determine stroke styling based on state priority
-  // Priority: Selected > Being Edited > Hovered
+  // Priority: Selected > Being Edited > Hovered > Default shape stroke
   let stroke: string | undefined;
   let strokeWidth: number;
   let dash: number[] | undefined;
   
   if (isSelected) {
-    // Selected: Solid green border
-    stroke = '#10B981';
+    // Selected: Solid blue border
+    stroke = '#3B82F6'; // blue-500
     strokeWidth = 3;
     dash = undefined;
   } else if (isBeingEdited && editorColor) {
@@ -81,8 +97,9 @@ export const Shape = React.memo(({
     strokeWidth = 2;
     dash = undefined;
   } else {
-    stroke = undefined;
-    strokeWidth = 0;
+    // Default: Use shape's own stroke properties if defined
+    stroke = shape.stroke;
+    strokeWidth = shape.strokeWidth || 0;
     dash = undefined;
   }
 
@@ -93,6 +110,7 @@ export const Shape = React.memo(({
     onClick: handleClick,
     onTap: handleClick,
     onDragStart: handleDragStart,
+    onDragMove: handleDragMove,
     onDragEnd: handleDragEnd,
     stroke,
     strokeWidth,
