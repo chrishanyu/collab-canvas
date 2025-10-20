@@ -139,6 +139,7 @@ export async function executeFunctionCalls(
 ): Promise<ExecutionResult> {
   const shapeIds: string[] = [];
   let lastError: string | undefined;
+  const operationTypes = new Set<string>();
 
   for (const functionCall of functionCalls) {
     const result = await executeFunctionCall(functionCall, canvasId, userId, userName);
@@ -147,10 +148,25 @@ export async function executeFunctionCalls(
       if (result.shapeIds) {
         shapeIds.push(...result.shapeIds);
       }
+      // Track operation type
+      if (result.operationType) {
+        operationTypes.add(result.operationType);
+      }
     } else {
       // Log error but continue executing (partial success is acceptable)
       console.warn(`Function call failed: ${functionCall.name}`, result.error);
       lastError = result.error;
+    }
+  }
+
+  // Determine overall operation type
+  // If all operations are the same type, use that type
+  // If mixed or unknown, don't specify a type
+  let operationType: 'create' | 'update' | 'delete' | undefined;
+  if (operationTypes.size === 1) {
+    const type = Array.from(operationTypes)[0];
+    if (type === 'create' || type === 'update' || type === 'delete') {
+      operationType = type;
     }
   }
 
@@ -159,6 +175,7 @@ export async function executeFunctionCalls(
     return {
       success: true,
       shapeIds,
+      operationType,
       error: lastError ? `Partial success: ${lastError}` : undefined,
     };
   }
@@ -175,6 +192,7 @@ export async function executeFunctionCalls(
   return {
     success: true,
     shapeIds: [],
+    operationType,
   };
 }
 
