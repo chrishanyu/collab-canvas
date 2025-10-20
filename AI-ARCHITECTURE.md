@@ -29,8 +29,8 @@ The AI Canvas Agent uses a **secure serverless function** architecture where the
                    ↓ HTTPS (API key secure here)
 ┌─────────────────────────────────────────────┐
 │ OpenAI API                                  │
-│  ├─ GPT-4 Turbo model                       │
-│  ├─ Modern Tools API (not deprecated)       │
+│  ├─ GPT-5 Nano model                        │
+│  ├─ Modern Tools API                        │
 │  └─ Returns structured tool calls           │
 └──────────────────┬──────────────────────────┘
                    │
