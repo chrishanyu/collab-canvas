@@ -90,6 +90,7 @@ describe('useAIAgent', () => {
       const mockExecution: ExecutionResult = {
         success: true,
         shapeIds: ['shape-123'],
+        operationType: 'create',
       };
 
       vi.mocked(aiService.sendAICommand).mockResolvedValue(mockResponse);
@@ -174,6 +175,7 @@ describe('useAIAgent', () => {
       const mockExecution: ExecutionResult = {
         success: true,
         shapeIds: ['shape-1', 'shape-2'],
+        operationType: 'create',
       };
 
       vi.mocked(aiService.sendAICommand).mockResolvedValue(mockResponse);

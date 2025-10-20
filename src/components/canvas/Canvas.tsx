@@ -86,6 +86,7 @@ export const Canvas: React.FC = () => {
   // Shape state
   const [shapes, setShapes] = useState<CanvasObject[]>([]);
   const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([]); // Multi-selection support
+  const [pendingSelectionIds, setPendingSelectionIds] = useState<string[]>([]); // Shapes to select when they appear
   
   // Text edit mode state
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
@@ -788,6 +789,21 @@ export const Canvas: React.FC = () => {
   }, []);
 
   useRealtimeSync(canvasId, handleShapesUpdate);
+
+  // Watch for pending selections and select shapes when they appear
+  useEffect(() => {
+    if (pendingSelectionIds.length === 0) return;
+
+    // Check if all pending shapes now exist in the shapes array
+    const shapeIds = new Set(shapes.map(s => s.id));
+    const allExist = pendingSelectionIds.every(id => shapeIds.has(id));
+
+    if (allExist) {
+      // All shapes exist, select them now
+      setSelectedShapeIds(pendingSelectionIds);
+      setPendingSelectionIds([]); // Clear pending queue
+    }
+  }, [shapes, pendingSelectionIds]);
 
   // Handle window resize
   useEffect(() => {
@@ -1933,7 +1949,7 @@ export const Canvas: React.FC = () => {
           userId={currentUser.id}
           userName={currentUser.displayName}
           onClose={handleToggleAI}
-          onShapesCreated={setSelectedShapeIds} // Auto-select AI-created shapes
+          onShapesCreated={setPendingSelectionIds} // Queue shapes for selection when they appear
           canvasState={{
             shapes: shapes.map(shape => ({
               id: shape.id,
