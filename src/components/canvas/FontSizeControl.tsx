@@ -25,9 +25,6 @@ export const FontSizeControl: React.FC<FontSizeControlProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Find current size label
-  const currentSize = FONT_SIZES.find(s => s.value === value) || FONT_SIZES[1];
-
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
