@@ -18,6 +18,7 @@ interface AICommandInputProps {
   userName: string;
   canvasState?: CanvasState;
   onClose?: () => void;
+  onShapesCreated?: (shapeIds: string[]) => void;
 }
 
 export const AICommandInput: React.FC<AICommandInputProps> = ({
@@ -26,6 +27,7 @@ export const AICommandInput: React.FC<AICommandInputProps> = ({
   userName,
   canvasState,
   onClose,
+  onShapesCreated,
 }) => {
   const [command, setCommand] = useState('');
   const { state, executeCommand } = useAIAgent({
@@ -33,6 +35,7 @@ export const AICommandInput: React.FC<AICommandInputProps> = ({
     userId,
     userName,
     canvasState,
+    onShapesCreated,
   });
 
   // Track previous status to detect transitions

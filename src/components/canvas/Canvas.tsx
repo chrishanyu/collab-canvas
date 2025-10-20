@@ -1659,6 +1659,7 @@ export const Canvas: React.FC = () => {
           userId={currentUser.id}
           userName={currentUser.displayName}
           onClose={handleToggleAI}
+          onShapesCreated={setSelectedShapeIds} // Auto-select AI-created shapes
           canvasState={{
             shapes: shapes.map(shape => ({
               id: shape.id,

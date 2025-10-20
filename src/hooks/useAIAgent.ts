@@ -15,6 +15,7 @@ interface UseAIAgentProps {
   userId: string;
   userName: string;
   canvasState?: CanvasState;
+  onShapesCreated?: (shapeIds: string[]) => void; // Callback when AI creates shapes
 }
 
 interface UseAIAgentReturn {
@@ -30,7 +31,8 @@ export function useAIAgent({
   canvasId, 
   userId, 
   userName,
-  canvasState 
+  canvasState,
+  onShapesCreated
 }: UseAIAgentProps): UseAIAgentReturn {
   const [state, setState] = useState<AIAgentState>({
     status: 'idle',
@@ -88,6 +90,11 @@ export function useAIAgent({
       const shapeCount = executionResult.shapeIds?.length || 0;
       if (shapeCount > 0) {
         showSuccessToast(`✓ Created ${shapeCount} shape${shapeCount > 1 ? 's' : ''}`);
+        
+        // Auto-select created shapes if callback provided
+        if (onShapesCreated && executionResult.shapeIds) {
+          onShapesCreated(executionResult.shapeIds);
+        }
       } else {
         showSuccessToast('✓ Command executed successfully');
       }
@@ -123,7 +130,7 @@ export function useAIAgent({
         }));
       }, 5000);
     }
-  }, [canvasId, userId, userName, canvasState]);
+  }, [canvasId, userId, userName, canvasState, onShapesCreated]);
 
   /**
    * Reset state to idle

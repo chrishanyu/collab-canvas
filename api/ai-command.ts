@@ -88,18 +88,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Add canvas state as context if provided
     if (canvasState && canvasState.shapes && canvasState.shapes.length > 0) {
-      const shapesToSend = canvasState.shapes.slice(-20); // Send last 20 shapes (most recent)
       const selectedShapeIds = canvasState.selectedShapeIds || [];
+      
+      // ALWAYS include selected shapes + recent shapes (up to 20 total)
+      let shapesToSend: any[] = [];
+      
+      if (selectedShapeIds.length > 0) {
+        // Include all selected shapes (they are the primary target!)
+        const selectedShapes = canvasState.shapes.filter((s: any) => 
+          selectedShapeIds.includes(s.id)
+        );
+        shapesToSend.push(...selectedShapes);
+        
+        // Add recent shapes not already selected (up to 20 total)
+        const recentShapes = canvasState.shapes
+          .slice(-20)
+          .filter((s: any) => !selectedShapeIds.includes(s.id));
+        
+        const remainingSpace = 20 - shapesToSend.length;
+        if (remainingSpace > 0) {
+          shapesToSend.push(...recentShapes.slice(-remainingSpace));
+        }
+      } else {
+        // No selection - just send last 20 shapes
+        shapesToSend = canvasState.shapes.slice(-20);
+      }
       
       let contextMessage = `Current canvas state:\n`;
       contextMessage += `- Total shapes: ${canvasState.shapes.length}\n`;
-      contextMessage += `- Selected shapes: ${selectedShapeIds.length > 0 ? selectedShapeIds.join(', ') : 'none'}\n`;
-      contextMessage += `\nShapes (most recent ${shapesToSend.length}):\n`;
+      
+      if (selectedShapeIds.length > 0) {
+        contextMessage += `- ⚠️ USER HAS SELECTED ${selectedShapeIds.length} SHAPE(S) - THESE ARE YOUR ONLY TARGET!\n`;
+        contextMessage += `- Selected IDs: ${selectedShapeIds.join(', ')}\n`;
+        contextMessage += `- 🎯 For manipulation commands: Use ONLY these selected shapes!\n`;
+      } else {
+        contextMessage += `- ⚠️ NO SHAPES SELECTED!\n`;
+        contextMessage += `- 🚫 MANIPULATION COMMANDS ARE NOT ALLOWED (move, resize, rotate, color, delete, arrange)\n`;
+        contextMessage += `- ✅ CREATION COMMANDS ARE ALLOWED (createShape, createGrid)\n`;
+        contextMessage += `- 💬 If user tries to manipulate, respond: "Please select the shapes you want to manipulate first."\n`;
+      }
+      
+      contextMessage += `\nShapes visible to you:\n`;
       
       shapesToSend.forEach((shape: any, index: number) => {
         const isSelected = selectedShapeIds.includes(shape.id);
-        const recentIndex = canvasState.shapes.length - shapesToSend.length + index + 1;
-        contextMessage += `${recentIndex}. ${shape.type} (id: ${shape.id})${isSelected ? ' [SELECTED]' : ''} - pos: (${shape.x}, ${shape.y}), size: ${shape.width}x${shape.height}, color: ${shape.fill}${shape.text ? `, text: "${shape.text}"` : ''}\n`;
+        contextMessage += `${index + 1}. ${shape.type} (id: ${shape.id})${isSelected ? ' ⭐[SELECTED]⭐' : ''} - pos: (${shape.x}, ${shape.y}), size: ${shape.width}x${shape.height}, color: ${shape.fill}${shape.text ? `, text: "${shape.text}"` : ''}\n`;
       });
       
       console.log('[AI-DEBUG] Canvas state sent to AI:', contextMessage);
