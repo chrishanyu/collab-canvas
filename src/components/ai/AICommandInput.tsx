@@ -30,6 +30,7 @@ export const AICommandInput: React.FC<AICommandInputProps> = ({
   onShapesCreated,
 }) => {
   const [command, setCommand] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { state, executeCommand } = useAIAgent({
     canvasId,
     userId,
@@ -53,6 +54,17 @@ export const AICommandInput: React.FC<AICommandInputProps> = ({
     previousStatusRef.current = state.status;
   }, [state.status, state.lastCommand, canvasId]);
 
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      // Reset height to auto to get the correct scrollHeight
+      textarea.style.height = 'auto';
+      // Set height to scrollHeight (capped by max-height in CSS)
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  }, [command]);
+
   const handleSubmit = async () => {
     if (!command.trim() || state.isLoading) return;
     await executeCommand(command);
@@ -62,7 +74,7 @@ export const AICommandInput: React.FC<AICommandInputProps> = ({
     setCommand(historicalCommand);
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -104,20 +116,22 @@ export const AICommandInput: React.FC<AICommandInputProps> = ({
 
       {/* Input Area */}
       <div className="p-4">
-        <div className={`flex items-center gap-2 border-2 rounded-lg transition-colors ${getBorderColor()}`}>
-          <input
-            type="text"
+        <div className={`flex items-start gap-2 border-2 rounded-lg transition-colors ${getBorderColor()}`}>
+          <textarea
+            ref={textareaRef}
             value={command}
             onChange={(e) => setCommand(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Create a red circle..."
             disabled={state.isLoading}
-            className="flex-1 px-3 py-2 outline-none rounded-l-lg disabled:bg-gray-50 disabled:text-gray-500"
+            rows={1}
+            className="flex-1 px-3 py-2 outline-none rounded-l-lg disabled:bg-gray-50 disabled:text-gray-500 resize-none overflow-hidden min-h-[40px] max-h-[200px]"
+            style={{ lineHeight: '1.5' }}
           />
           <button
             onClick={handleSubmit}
             disabled={!command.trim() || state.isLoading}
-            className={`px-4 py-2 rounded-r-lg font-medium transition-colors ${
+            className={`px-4 py-2 rounded-r-lg font-medium transition-colors self-stretch ${
               state.isLoading
                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 : command.trim()
