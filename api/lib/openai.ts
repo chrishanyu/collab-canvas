@@ -12,6 +12,6 @@ export const openai = new OpenAI({
 
 // Configuration constants
 export const AI_CONFIG = {
-  model: 'gpt-5', // Latest model for tool calling
+  model: 'gpt-5-nano', // Latest model for tool calling
   reasoning_effort: 'minimal',
 } as const;

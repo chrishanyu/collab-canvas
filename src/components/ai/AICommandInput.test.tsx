@@ -49,7 +49,7 @@ describe('AICommandInput', () => {
     it('should render input field with placeholder', () => {
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       expect(input).toBeInTheDocument();
       expect(input).toHaveValue('');
     });
@@ -76,7 +76,7 @@ describe('AICommandInput', () => {
       const user = userEvent.setup();
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, 'Create a blue circle');
 
       expect(input).toHaveValue('Create a blue circle');
@@ -89,7 +89,7 @@ describe('AICommandInput', () => {
       const button = screen.getByRole('button', { name: /send/i });
       expect(button).toBeDisabled();
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, 'test');
 
       expect(button).not.toBeDisabled();
@@ -106,7 +106,7 @@ describe('AICommandInput', () => {
       const user = userEvent.setup();
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, '   ');
 
       const button = screen.getByRole('button', { name: /send/i });
@@ -138,7 +138,7 @@ describe('AICommandInput', () => {
 
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, 'Create a red circle');
 
       const button = screen.getByRole('button', { name: /send/i });
@@ -172,7 +172,7 @@ describe('AICommandInput', () => {
 
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, 'test command{Enter}');
 
       await waitFor(() => {
@@ -189,7 +189,7 @@ describe('AICommandInput', () => {
       const user = userEvent.setup();
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, 'test{Shift>}{Enter}{/Shift}');
 
       expect(aiService.sendAICommand).not.toHaveBeenCalled();
@@ -199,7 +199,7 @@ describe('AICommandInput', () => {
       const user = userEvent.setup();
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, '{Enter}');
 
       expect(aiService.sendAICommand).not.toHaveBeenCalled();
@@ -230,7 +230,7 @@ describe('AICommandInput', () => {
 
       render(<AICommandInput {...defaultProps} canvasState={canvasState} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, 'test{Enter}');
 
       await waitFor(() => {
@@ -255,7 +255,7 @@ describe('AICommandInput', () => {
 
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, 'test{Enter}');
 
       await waitFor(() => {
@@ -272,7 +272,7 @@ describe('AICommandInput', () => {
 
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       const button = screen.getByRole('button', { name: /send/i });
 
       await user.type(input, 'test{Enter}');
@@ -292,7 +292,7 @@ describe('AICommandInput', () => {
 
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, 'test{Enter}');
 
       await waitFor(() => {
@@ -311,7 +311,7 @@ describe('AICommandInput', () => {
 
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, 'test{Enter}');
 
       await waitFor(() => {
@@ -328,7 +328,7 @@ describe('AICommandInput', () => {
 
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, 'test{Enter}');
 
       await waitFor(() => {
@@ -346,7 +346,7 @@ describe('AICommandInput', () => {
 
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, 'test{Enter}');
 
       await waitFor(() => {
@@ -374,7 +374,7 @@ describe('AICommandInput', () => {
 
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, 'test{Enter}');
 
       await waitFor(() => {
@@ -388,7 +388,7 @@ describe('AICommandInput', () => {
     it('should apply default border color when idle', () => {
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       const inputWrapper = input.parentElement;
       expect(inputWrapper).toHaveClass('border-gray-300');
     });
@@ -402,7 +402,7 @@ describe('AICommandInput', () => {
 
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, 'test{Enter}');
 
       await waitFor(() => {
@@ -430,7 +430,7 @@ describe('AICommandInput', () => {
 
       render(<AICommandInput {...defaultProps} />);
 
-      const input = screen.getByPlaceholderText('Create a red circle...');
+      const input = screen.getByPlaceholderText(/Create a red circle/i);
       await user.type(input, 'test{Enter}');
 
       // If default wasn't prevented, form would submit and test would fail
