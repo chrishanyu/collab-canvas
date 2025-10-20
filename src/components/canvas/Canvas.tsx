@@ -1923,7 +1923,9 @@ export const Canvas: React.FC = () => {
         const handleColorCommit = async (color: string) => {
           addRecentColor(color);
           // Save the final color to Firebase
-          await handleShapeUpdate({ color });
+          // Use 'color' property for text shapes, 'fill' for regular shapes
+          const updates = selectedShape.type === 'text' ? { color } : { fill: color };
+          await handleShapeUpdate(updates);
         };
 
         return (
