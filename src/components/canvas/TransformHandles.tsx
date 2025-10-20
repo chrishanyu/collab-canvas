@@ -14,7 +14,8 @@ interface TransformHandlesProps {
  * TransformHandles Component
  * 
  * Renders resize handles for a selected shape.
- * - 4 corner resize handles (white squares with blue borders)
+ * - For regular shapes: 4 corner resize handles
+ * - For text boxes: 2 edge handles (left and right) for horizontal resizing only
  * 
  * Only shown when a single shape is selected (not for multi-selection).
  */
@@ -40,6 +41,9 @@ export const TransformHandles: React.FC<TransformHandlesProps> = ({
     shapeWidth: number;
     shapeHeight: number;
   } | null>(null);
+
+  // Track which edge is being dragged (for non-draggable edge handles)
+  const activeEdgeRef = React.useRef<'left' | 'right' | null>(null);
 
   // Calculate handle positions based on shape type
   const getShapeBounds = () => {
@@ -170,11 +174,78 @@ export const TransformHandles: React.FC<TransformHandlesProps> = ({
 
   const handleResizeDragEnd = () => {
     dragStartRef.current = null;
+    activeEdgeRef.current = null;
     // Save to Firebase after resize completes
     onResizeEnd(shape.id);
   };
 
-  // Render a single resize handle
+  // Edge resize start (for horizontal-only resizing on text boxes)
+  const handleEdgeResizeStart = (e: Konva.KonvaEventObject<MouseEvent>, edge: 'left' | 'right') => {
+    e.cancelBubble = true;
+    const stage = e.target.getStage();
+    if (!stage) return;
+
+    const pointerPos = stage.getPointerPosition();
+    if (!pointerPos) return;
+
+    // Store initial state for resize calculations
+    dragStartRef.current = {
+      mouseX: pointerPos.x,
+      mouseY: pointerPos.y,
+      shapeX: shape.x,
+      shapeY: shape.y,
+      shapeWidth: shape.width,
+      shapeHeight: shape.height,
+    };
+    
+    activeEdgeRef.current = edge;
+
+    // Add stage mouse move and mouse up listeners
+    const handleStageMouseMove = () => {
+      if (!activeEdgeRef.current || !dragStartRef.current || !stage) return;
+
+      const pointerPos = stage.getPointerPosition();
+      if (!pointerPos) return;
+
+      const { mouseX, shapeX, shapeWidth, shapeHeight } = dragStartRef.current;
+      
+      // Calculate mouse delta (accounting for stage scale)
+      const deltaX = (pointerPos.x - mouseX) / stageScale;
+
+      let newX = shapeX;
+      let newWidth = shapeWidth;
+
+      // Apply resize based on which edge is being dragged
+      if (activeEdgeRef.current === 'left') {
+        // Anchor: right edge stays fixed
+        newX = shapeX + deltaX;
+        newWidth = shapeWidth - deltaX;
+      } else {
+        // Anchor: left edge stays fixed
+        newWidth = shapeWidth + deltaX;
+      }
+
+      // Enforce minimum size to prevent inversion
+      const MIN_SIZE = 50; // Use MIN_TEXT_WIDTH for text boxes
+      if (newWidth < MIN_SIZE) {
+        return;
+      }
+
+      // Call the resize handler with new width (height will be auto-calculated)
+      onResize(shape.id, newX, dragStartRef.current.shapeY, newWidth, shapeHeight);
+    };
+
+    const handleStageMouseUp = () => {
+      stage.off('mousemove', handleStageMouseMove);
+      stage.off('mouseup', handleStageMouseUp);
+      handleResizeDragEnd();
+    };
+
+    stage.on('mousemove', handleStageMouseMove);
+    stage.on('mouseup', handleStageMouseUp);
+  };
+
+  // Render a single resize handle (corner)
   const renderResizeHandle = (
     corner: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight',
     position: { x: number; y: number }
@@ -227,13 +298,64 @@ export const TransformHandles: React.FC<TransformHandlesProps> = ({
     );
   };
 
+  // Render a single edge handle (for text boxes)
+  const renderEdgeHandle = (
+    edge: 'left' | 'right',
+    position: { x: number; y: number }
+  ) => {
+    return (
+      <Rect
+        key={`handle-${edge}`}
+        x={position.x - (HANDLE_SIZE * handleScale) / 2}
+        y={position.y - (HANDLE_SIZE * handleScale) / 2}
+        width={HANDLE_SIZE * handleScale}
+        height={HANDLE_SIZE * handleScale}
+        fill="white"
+        stroke="#3B82F6" // blue-500
+        strokeWidth={handleStrokeWidth}
+        cornerRadius={2 * handleScale}
+        draggable={false}
+        onMouseDown={(e) => {
+          handleEdgeResizeStart(e, edge);
+        }}
+        onMouseEnter={(e) => {
+          const container = e.target.getStage()?.container();
+          if (container) {
+            container.style.cursor = 'ew-resize'; // Horizontal resize cursor
+          }
+        }}
+        onMouseLeave={(e) => {
+          const container = e.target.getStage()?.container();
+          if (container) {
+            container.style.cursor = 'default';
+          }
+        }}
+        perfectDrawEnabled={false}
+      />
+    );
+  };
+
+  // For text boxes, render edge handles (left and right only)
+  // For other shapes, render corner handles
+  const isTextBox = shape.type === 'text';
+
   return (
     <Group listening={true}>
-      {/* Resize handles at 4 corners */}
-      {renderResizeHandle('topLeft', corners.topLeft)}
-      {renderResizeHandle('topRight', corners.topRight)}
-      {renderResizeHandle('bottomLeft', corners.bottomLeft)}
-      {renderResizeHandle('bottomRight', corners.bottomRight)}
+      {isTextBox ? (
+        <>
+          {/* Edge handles for text boxes (horizontal resize only) */}
+          {renderEdgeHandle('left', { x: bounds.left, y: bounds.centerY })}
+          {renderEdgeHandle('right', { x: bounds.right, y: bounds.centerY })}
+        </>
+      ) : (
+        <>
+          {/* Corner handles for regular shapes */}
+          {renderResizeHandle('topLeft', corners.topLeft)}
+          {renderResizeHandle('topRight', corners.topRight)}
+          {renderResizeHandle('bottomLeft', corners.bottomLeft)}
+          {renderResizeHandle('bottomRight', corners.bottomRight)}
+        </>
+      )}
     </Group>
   );
 };

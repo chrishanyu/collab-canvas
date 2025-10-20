@@ -48,6 +48,16 @@ CollabCanvas uses a **multi-canvas architecture** where each canvas is an isolat
 - **Presentational components:** `Shape`, `Cursor`, `CanvasCard` (render only)
 - **Why:** Clear separation of concerns, easy testing
 
+#### 6. AI Canvas Agent Architecture
+**Pattern:** Secure serverless function with client-side execution
+- **Backend:** Vercel serverless function handles OpenAI communication
+- **Security:** API key protected server-side (never exposed to browser)
+- **Function Calling:** OpenAI GPT-4 Turbo returns structured tool calls
+- **Execution:** Frontend executes functions via existing canvas services
+- **Sync:** AI-generated shapes sync via Firebase real-time listeners
+- **Modular:** Organized into auth, prompts, schemas, rate limiting modules
+- **Why:** Secure, maintainable, integrates seamlessly with existing infrastructure
+
 ## Core System Components
 
 ### Frontend Architecture
@@ -214,6 +224,60 @@ Revert User B's optimistic update
 Real-time sync provides latest version (6) to User B
   ↓
 User B can retry edit (conflict detected, zero data loss)
+```
+
+#### Pattern: AI Command Execution
+```
+User types "Create a login form" in AI panel
+  ↓
+AICommandInput captures command
+  ↓
+useAIAgent.executeCommand() called
+  ↓
+ai.service.sendAICommand(command, canvasId, userId, canvasState)
+  ↓
+POST /api/ai-command with Firebase auth token
+  ↓
+[BACKEND: Vercel Serverless Function]
+  ↓
+Verify Firebase auth token (lib/auth.ts)
+  ↓
+Check rate limit: 10 req/min (lib/rateLimit.ts)
+  ↓
+Load system prompt (lib/prompts.ts - 15 functions, 50+ examples)
+  ↓
+Call OpenAI GPT-4 Turbo with tools API (lib/openai.ts)
+  ↓
+AI returns tool calls:
+  [
+    {name: 'createShape', arguments: {type: 'text', text: 'Username', ...}},
+    {name: 'createShape', arguments: {type: 'rectangle', ...}},
+    {name: 'createShape', arguments: {type: 'text', text: 'Password', ...}},
+    {name: 'createShape', arguments: {type: 'rectangle', ...}},
+    {name: 'createShape', arguments: {type: 'rectangle', text: 'Login', ...}}
+  ]
+  ↓
+Return tool calls to frontend
+  ↓
+[FRONTEND: Function Execution]
+  ↓
+aiCommands.executeFunctionCalls(functionCalls, canvasId, userId)
+  ↓
+For each function call:
+  ↓
+  Execute via canvasObjects.service (e.g., createShape, moveShape, etc.)
+  ↓
+  Write to Firebase: /canvas-objects/{canvasId}/objects/{shapeId}
+  ↓
+Firebase broadcasts to all users on canvas
+  ↓
+useRealtimeSync receives updates
+  ↓
+Konva re-renders with new shapes
+  ↓
+All users see login form appear in real-time
+  ↓
+Success toast: "✓ Created 5 shapes"
 ```
 
 ## Design Patterns in Use

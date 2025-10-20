@@ -15,6 +15,7 @@ interface CanvasProviderProps {
 export const CanvasProvider: React.FC<CanvasProviderProps> = ({ children }) => {
   const [shapes, setShapes] = useState<CanvasObject[]>([]);
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [isCreatingShape, setIsCreatingShape] = useState(false);
 
   const createShape = (shapeData: Omit<CanvasObject, 'id' | 'createdAt' | 'updatedAt' | 'version' | 'lastEditedBy'>) => {
@@ -61,11 +62,13 @@ export const CanvasProvider: React.FC<CanvasProviderProps> = ({ children }) => {
   const value: CanvasContextType = {
     shapes,
     selectedShapeId,
+    editingTextId,
     isCreatingShape,
     createShape,
     updateShape,
     deleteShape,
     selectShape,
+    setEditingTextId,
     setCreatingShape,
     setShapes,
   };

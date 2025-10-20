@@ -1,7 +1,7 @@
 import React from 'react';
 import { Rect, Circle, Ellipse, Star, RegularPolygon } from 'react-konva';
 import type { ShapeType } from '../../types';
-import { DEFAULT_SHAPE_FILL, DEFAULT_SHAPE_STROKE, DEFAULT_SHAPE_STROKE_WIDTH } from '../../utils/constants';
+import { DEFAULT_SHAPE_FILL, DEFAULT_SHAPE_STROKE, DEFAULT_SHAPE_STROKE_WIDTH, DEFAULT_TEXT_WIDTH, DEFAULT_FONT_SIZE } from '../../utils/constants';
 
 interface PreviewShapeProps {
   shapeType: ShapeType;
@@ -99,6 +99,23 @@ export const PreviewShape: React.FC<PreviewShapeProps> = ({
           sides={8}
           radius={size / 2}
           {...previewProps}
+        />
+      );
+    
+    case 'text':
+      return (
+        <Rect
+          x={x}
+          y={y}
+          width={DEFAULT_TEXT_WIDTH}
+          height={DEFAULT_FONT_SIZE * 1.2}
+          opacity={0.4}
+          fill="transparent"
+          stroke={DEFAULT_SHAPE_STROKE}
+          strokeWidth={1}
+          dash={[5, 5]}
+          listening={false}
+          perfectDrawEnabled={false}
         />
       );
     

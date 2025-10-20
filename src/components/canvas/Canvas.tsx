@@ -26,7 +26,8 @@ import { GridDots } from './GridDots';
 import { UserPresence } from '../presence/UserPresence';
 import { ShapeEditBar } from './ShapeEditBar';
 import { AICommandInput } from '../ai/AICommandInput';
-import { constrainZoom, getRelativePointerPosition, generateUniqueId, getMaxZIndex, getMinZIndex } from '../../utils/canvasHelpers';
+import { TextEditOverlay } from './TextEditOverlay';
+import { constrainZoom, getRelativePointerPosition, generateUniqueId, getMaxZIndex, getMinZIndex, calculateTextHeight, getUserCursorColor } from '../../utils/canvasHelpers';
 import type { Canvas as CanvasType, CanvasObject, ShapeType } from '../../types';
 import { ConflictError } from '../../types';
 import {
@@ -35,6 +36,11 @@ import {
   DEFAULT_SHAPE_FILL,
   DEFAULT_SHAPE_STROKE,
   DEFAULT_SHAPE_STROKE_WIDTH,
+  DEFAULT_FONT_SIZE,
+  DEFAULT_FONT_FAMILY,
+  DEFAULT_TEXT_WIDTH,
+  DEFAULT_TEXT_COLOR,
+  MIN_TEXT_WIDTH,
 } from '../../utils/constants';
 
 /**
@@ -80,6 +86,9 @@ export const Canvas: React.FC = () => {
   // Shape state
   const [shapes, setShapes] = useState<CanvasObject[]>([]);
   const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([]); // Multi-selection support
+  
+  // Text edit mode state
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
   
   // Interaction mode state ('pan' is default)
   const [interactionMode, setInteractionMode] = useState<'select' | 'pan'>('pan');
@@ -135,6 +144,8 @@ export const Canvas: React.FC = () => {
   // Active edits tracking (for showing OTHER users' edits)
   const {
     getShapeEditor,
+    setShapeEditing,
+    clearShapeEditing,
   } = useActiveEdits(canvasId || '', currentUser?.id || '');
 
   // Recent colors management (stored per-user in Firebase)
@@ -610,6 +621,16 @@ export const Canvas: React.FC = () => {
 
   // Keyboard shortcuts setup
   useKeyboardShortcuts([
+    // T: Activate text creation mode
+    {
+      key: 't',
+      handler: () => {
+        if (!editingTextId) {  // Only if not editing text
+          handleCreateText();
+        }
+      },
+      preventDefault: true,
+    },
     // ESC: Clear selection, close panels, cancel modes
     {
       key: 'Escape',
@@ -735,7 +756,13 @@ export const Canvas: React.FC = () => {
           prevShape.height !== syncedShape.height ||
           prevShape.fill !== syncedShape.fill ||
           prevShape.zIndex !== syncedShape.zIndex ||
-          prevShape.version !== syncedShape.version
+          prevShape.version !== syncedShape.version ||
+          prevShape.text !== syncedShape.text ||
+          prevShape.fontSize !== syncedShape.fontSize ||
+          prevShape.fontFamily !== syncedShape.fontFamily ||
+          prevShape.color !== syncedShape.color ||
+          prevShape.textFormat?.bold !== syncedShape.textFormat?.bold ||
+          prevShape.textFormat?.italic !== syncedShape.textFormat?.italic
         ) {
           hasChanges = true;
           syncedMap.delete(prevShape.id);
@@ -847,8 +874,12 @@ export const Canvas: React.FC = () => {
 
   // Text creation handler
   const handleCreateText = () => {
-    // Text feature coming soon - placeholder for future implementation
-    showWarning('Text feature coming soon!');
+    setCreatingShapeType('text');
+    clearSelection(); // Deselect any selected shapes
+    // Switch to select mode if in pan mode (for better UX)
+    if (interactionMode === 'pan') {
+      setInteractionMode('select');
+    }
   };
 
   const handleSelectShape = (shapeType: string) => {
@@ -988,6 +1019,7 @@ export const Canvas: React.FC = () => {
     if (!pos) return;
 
     // Exit creation mode immediately to prevent rapid clicking
+    const currentCreatingType = creatingShapeType;
     setCreatingShapeType(null);
     setPreviewPosition(null);
 
@@ -995,16 +1027,27 @@ export const Canvas: React.FC = () => {
     const DEFAULT_SHAPE_WIDTH = 100;
     const DEFAULT_SHAPE_HEIGHT = 100;
 
+    // Text-specific properties
+    const isTextBox = currentCreatingType === 'text';
+    const textDefaults = isTextBox ? {
+      text: '', // Start with empty text
+      fontSize: DEFAULT_FONT_SIZE,
+      fontFamily: DEFAULT_FONT_FAMILY,
+      color: DEFAULT_TEXT_COLOR,
+    } : {};
+
     // Create shape centered at click position based on type
+    // For text boxes, position top-left instead of centered
     const shapeData = {
-      type: creatingShapeType as ShapeType,
-      x: pos.x - DEFAULT_SHAPE_WIDTH / 2,
-      y: pos.y - DEFAULT_SHAPE_HEIGHT / 2,
-      width: DEFAULT_SHAPE_WIDTH,
-      height: DEFAULT_SHAPE_HEIGHT,
-      fill: DEFAULT_SHAPE_FILL, // White fill
-      stroke: DEFAULT_SHAPE_STROKE, // Gray-800 border
-      strokeWidth: DEFAULT_SHAPE_STROKE_WIDTH, // 2px border
+      type: currentCreatingType as ShapeType,
+      x: isTextBox ? pos.x : pos.x - DEFAULT_SHAPE_WIDTH / 2,
+      y: isTextBox ? pos.y : pos.y - DEFAULT_SHAPE_HEIGHT / 2,
+      width: isTextBox ? DEFAULT_TEXT_WIDTH : DEFAULT_SHAPE_WIDTH,
+      height: isTextBox ? DEFAULT_FONT_SIZE * 1.2 : DEFAULT_SHAPE_HEIGHT, // Initial height for text
+      fill: isTextBox ? 'transparent' : DEFAULT_SHAPE_FILL, // Transparent for text boxes
+      stroke: isTextBox ? undefined : DEFAULT_SHAPE_STROKE, // No stroke for text boxes
+      strokeWidth: isTextBox ? undefined : DEFAULT_SHAPE_STROKE_WIDTH,
+      ...textDefaults,
       createdBy: currentUser.id,
     };
 
@@ -1023,6 +1066,14 @@ export const Canvas: React.FC = () => {
     
     setShapes(prevShapes => [...prevShapes, optimisticShape]);
     
+    // For text boxes, immediately enter edit mode
+    if (isTextBox) {
+      // Use setTimeout to ensure the text box is rendered before entering edit mode
+      setTimeout(() => {
+        handleEnterTextEditMode(shapeId);
+      }, 0);
+    }
+    
     // Write to Firebase in background with same ID
     try {
       await createShapeInFirebase(canvasId, shapeData, shapeId);
@@ -1032,6 +1083,11 @@ export const Canvas: React.FC = () => {
       showError('Failed to create shape. Please try again.');
       // Revert optimistic update on error
       setShapes(prevShapes => prevShapes.filter(s => s.id !== shapeId));
+      // Clear editing state and edit indicator if it was a text box
+      if (isTextBox && editingTextId === shapeId) {
+        await clearShapeEditing(shapeId);
+        setEditingTextId(null);
+      }
     }
   };
 
@@ -1298,6 +1354,106 @@ export const Canvas: React.FC = () => {
     }
   };
 
+  // Text Edit Mode Handlers
+  const handleEnterTextEditMode = async (id: string) => {
+    if (!currentUser) return;
+    
+    setEditingTextId(id);
+    // Deselect shape when entering edit mode
+    setSelectedShapeIds([]);
+    
+    // Set active edit indicator for real-time collaboration
+    const userColor = getUserCursorColor(currentUser.id, currentUser.id);
+    await setShapeEditing(id, currentUser.displayName, userColor);
+  };
+
+  const handleExitTextEditMode = async () => {
+    const currentEditingId = editingTextId;
+    
+    // Immediately set to null so text becomes visible right away
+    setEditingTextId(null);
+    
+    // Clear active edit indicator in the background
+    if (currentEditingId) {
+      await clearShapeEditing(currentEditingId);
+    }
+  };
+
+  const handleTextChange = async (id: string, newText: string) => {
+    if (!canvasId || !currentUser) return;
+
+    const shape = shapes.find(s => s.id === id);
+    if (!shape) return;
+
+    // Calculate new height based on text content
+    const fontSize = shape.fontSize || DEFAULT_FONT_SIZE;
+    const fontFamily = shape.fontFamily || DEFAULT_FONT_FAMILY;
+    const newHeight = calculateTextHeight(newText, shape.width, fontSize, fontFamily);
+
+    // Optimistic update (including height recalculation)
+    setShapes(prevShapes =>
+      prevShapes.map(s =>
+        s.id === id
+          ? {
+              ...s,
+              text: newText,
+              height: Math.round(newHeight),
+              updatedAt: new Date(),
+              version: s.version + 1,
+              lastEditedBy: currentUser.id,
+            }
+          : s
+      )
+    );
+
+    // Register pending update
+    pendingUpdates.current.set(id, shape.version + 1);
+
+    // Save to Firebase (include height update)
+    try {
+      await updateShapeInFirebase(
+        canvasId,
+        id,
+        { text: newText, height: Math.round(newHeight) },
+        currentUser.id,
+        shape.version
+      );
+    } catch (error) {
+      // Clear pending update
+      pendingUpdates.current.delete(id);
+
+      // Handle conflict errors
+      if (error instanceof ConflictError) {
+        const editorName = error.lastEditedByName || 'Another user';
+        showWarning(
+          `Text was modified by ${editorName}. Reloading latest version...`
+        );
+        
+        // Revert optimistic update (restore original text and height)
+        setShapes(prevShapes =>
+          prevShapes.map(s =>
+            s.id === id
+              ? { ...s, text: shape.text, height: shape.height }
+              : s
+          )
+        );
+        return;
+      }
+
+      console.error('Failed to update text in Firebase:', error);
+      showError('Failed to save text changes. Please try again.');
+      
+      // Rollback (restore original text and height)
+      setShapes(prevShapes =>
+        prevShapes.map(s =>
+          s.id === id
+            ? { ...s, text: shape.text, height: shape.height }
+            : s
+        )
+      );
+    }
+  };
+
   // Handle cursor movement for presence
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (updateCursorRef.current) {
@@ -1318,17 +1474,37 @@ export const Canvas: React.FC = () => {
   const handleResize = useCallback((id: string, x: number, y: number, width: number, height: number) => {
     // Optimistically update shape dimensions in local state
     setShapes(prevShapes =>
-      prevShapes.map(shape =>
-        shape.id === id
-          ? {
-              ...shape,
-              x: Math.round(x),
-              y: Math.round(y),
-              width: Math.round(width),
-              height: Math.round(height),
-            }
-          : shape
-      )
+      prevShapes.map(shape => {
+        if (shape.id !== id) return shape;
+
+        // For text boxes, enforce minimum width and auto-calculate height
+        if (shape.type === 'text') {
+          const constrainedWidth = Math.max(Math.round(width), MIN_TEXT_WIDTH);
+          const text = shape.text || '';
+          const fontSize = shape.fontSize || DEFAULT_FONT_SIZE;
+          const fontFamily = shape.fontFamily || DEFAULT_FONT_FAMILY;
+          
+          // Calculate height based on text content and new width
+          const calculatedHeight = calculateTextHeight(text, constrainedWidth, fontSize, fontFamily);
+          
+          return {
+            ...shape,
+            x: Math.round(x),
+            y: Math.round(y),
+            width: constrainedWidth,
+            height: Math.round(calculatedHeight),
+          };
+        }
+
+        // For other shapes, just update dimensions
+        return {
+          ...shape,
+          x: Math.round(x),
+          y: Math.round(y),
+          width: Math.round(width),
+          height: Math.round(height),
+        };
+      })
     );
   }, []);
 
@@ -1544,10 +1720,12 @@ export const Canvas: React.FC = () => {
                   key={shape.id}
                   shape={shape}
                   isSelected={isSelected(shape.id)}
+                  isEditMode={editingTextId === shape.id}
                   onSelect={handleSelectShapeId}
                   onDragStart={handleShapeDragStart}
                   onDragMove={handleShapeDragMove}
                   onDragEnd={handleShapeDragEnd}
+                  onEnterEditMode={handleEnterTextEditMode}
                   isBeingEdited={isBeingEdited}
                   editorName={editorName}
                   editorColor={editorColor}
@@ -1555,8 +1733,8 @@ export const Canvas: React.FC = () => {
               );
             })}
             
-            {/* Transform handles (resize only) - only for single selection */}
-            {selectedShapeIds.length === 1 && (() => {
+            {/* Transform handles (resize only) - only for single selection and not in edit mode */}
+            {selectedShapeIds.length === 1 && !editingTextId && (() => {
               const selectedShape = shapes.find(s => s.id === selectedShapeIds[0]);
               return selectedShape ? (
                 <TransformHandles
@@ -1595,6 +1773,27 @@ export const Canvas: React.FC = () => {
         </Stage>
       </div>
 
+      {/* Text Edit Overlay - HTML textarea for editing text boxes */}
+      {editingTextId && (() => {
+        const editingShape = shapes.find(s => s.id === editingTextId);
+        if (!editingShape) return null;
+        
+        // Create a key that changes when formatting changes to force re-render
+        const formatKey = `${editingTextId}-${editingShape.fontSize}-${editingShape.color}-${editingShape.textFormat?.bold}-${editingShape.textFormat?.italic}-${editingShape.version}`;
+        
+        return (
+          <TextEditOverlay
+            key={formatKey}
+            shape={editingShape}
+            stageX={stageX}
+            stageY={stageY}
+            stageScale={stageScale}
+            onTextChange={handleTextChange}
+            onExitEditMode={handleExitTextEditMode}
+          />
+        );
+      })()}
+
       {/* User Presence - Cursors and Online Users */}
       <UserPresence
         canvasId={canvasId}
@@ -1612,29 +1811,103 @@ export const Canvas: React.FC = () => {
         const selectedShape = shapes.find(s => s.id === selectedShapeIds[0]);
         if (!selectedShape) return null;
 
-        const handleShapeUpdate = (updates: Partial<CanvasObject>) => {
+        // Live preview handler (no Firebase write, just local state update)
+        const handleShapeLivePreview = (updates: Partial<CanvasObject>) => {
           if (!canvasId || !currentUser) return;
 
-          // Optimistic update (live preview during color picker dragging)
+          // Find current shape
+          const shape = shapes.find(s => s.id === selectedShape.id);
+          if (!shape) return;
+
+          // For text boxes, recalculate height when fontSize changes
+          let finalUpdates: Partial<CanvasObject> = { ...updates };
+          if (shape.type === 'text' && updates.fontSize !== undefined) {
+            const text = shape.text || '';
+            const fontSize = updates.fontSize;
+            const fontFamily = shape.fontFamily || DEFAULT_FONT_FAMILY;
+            const width = shape.width;
+            
+            const newHeight = calculateTextHeight(text, width, fontSize, fontFamily);
+            finalUpdates = { ...finalUpdates, height: Math.round(newHeight) };
+          }
+
+          // Optimistic update (local only, no Firebase, no version increment)
           setShapes(prevShapes =>
-            prevShapes.map(shape =>
-              shape.id === selectedShape.id
-                ? { ...shape, ...updates, updatedAt: new Date() }
-                : shape
+            prevShapes.map(s =>
+              s.id === selectedShape.id
+                ? { ...s, ...finalUpdates, updatedAt: new Date() }
+                : s
+            )
+          );
+        };
+
+        // Commit handler (saves to Firebase with version control)
+        const handleShapeUpdate = async (updates: Partial<CanvasObject>) => {
+          if (!canvasId || !currentUser) return;
+
+          // Find current shape to get version
+          const shape = shapes.find(s => s.id === selectedShape.id);
+          if (!shape) return;
+
+          // For text boxes, recalculate height when fontSize changes
+          let finalUpdates: Partial<CanvasObject> = { ...updates };
+          if (shape.type === 'text' && updates.fontSize !== undefined) {
+            const text = shape.text || '';
+            const fontSize = updates.fontSize;
+            const fontFamily = shape.fontFamily || DEFAULT_FONT_FAMILY;
+            const width = shape.width;
+            
+            const newHeight = calculateTextHeight(text, width, fontSize, fontFamily);
+            finalUpdates = { ...finalUpdates, height: Math.round(newHeight) };
+          }
+
+          // Optimistic update with version increment
+          const newVersion = shape.version + 1;
+          setShapes(prevShapes =>
+            prevShapes.map(s =>
+              s.id === selectedShape.id
+                ? { 
+                    ...s, 
+                    ...finalUpdates, 
+                    version: newVersion,
+                    updatedAt: new Date(),
+                    lastEditedBy: currentUser.id,
+                  }
+                : s
             )
           );
 
-          // Sync to Firebase
-          updateShapeInFirebase(canvasId, selectedShape.id, updates, currentUser.id)
-            .catch(error => {
-              console.error('Failed to update shape:', error);
-              showError('Failed to update shape. Please try again.');
-            });
+          // Register pending update
+          pendingUpdates.current.set(selectedShape.id, newVersion);
+
+          // Sync to Firebase with version for conflict detection
+          try {
+            await updateShapeInFirebase(
+              canvasId, 
+              selectedShape.id, 
+              finalUpdates, 
+              currentUser.id, 
+              shape.version
+            );
+          } catch (error) {
+            // Clear pending update on error
+            pendingUpdates.current.delete(selectedShape.id);
+            
+            console.error('Failed to update shape:', error);
+            showError('Failed to update shape. Please try again.');
+            
+            // Rollback optimistic update
+            setShapes(prevShapes =>
+              prevShapes.map(s => s.id === selectedShape.id ? shape : s)
+            );
+          }
         };
 
         // Called when user commits a color (closes popover or clicks swatch)
-        const handleColorCommit = (color: string) => {
+        const handleColorCommit = async (color: string) => {
           addRecentColor(color);
+          // Save the final color to Firebase
+          await handleShapeUpdate({ color });
         };
 
         return (
@@ -1644,6 +1917,7 @@ export const Canvas: React.FC = () => {
             stageX={stageX}
             stageY={stageY}
             onUpdate={handleShapeUpdate}
+            onLivePreview={handleShapeLivePreview}
             onColorCommit={handleColorCommit}
             onBringToFront={handleBringToFront}
             onSendToBack={handleSendToBack}

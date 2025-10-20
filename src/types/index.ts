@@ -32,13 +32,24 @@ export interface CanvasObject {
   strokeWidth?: number; // Border width in pixels
   rotation?: number; // Rotation angle in degrees
   zIndex?: number; // Layer order - higher values render on top (default: 0)
-  text?: string; // Text content for text labels on shapes
+  
+  // Text-specific properties (for type='text')
+  text?: string; // Text content for text boxes
+  fontSize?: number; // Font size in pixels (default: 16)
+  fontFamily?: string; // Font family (default: 'Arial')
+  color?: string; // Text color (default: '#000000')
+  
+  // Future text formatting (not implemented in V1)
   textFormat?: {
     bold?: boolean;
     italic?: boolean;
     underline?: boolean;
-    fontSize?: number;
+    textAlign?: 'left' | 'center' | 'right' | 'justify';
+    fontWeight?: number | 'normal' | 'bold';
+    fontStyle?: 'normal' | 'italic';
+    textDecoration?: 'none' | 'underline' | 'line-through';
   };
+  
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;

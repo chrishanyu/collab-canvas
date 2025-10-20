@@ -7,6 +7,7 @@ interface ColorPickerControlProps {
   onChange: (color: string) => void;
   onColorCommit?: (color: string) => void; // Called when user commits the color (not during dragging)
   recentColors?: string[];
+  showTextIcon?: boolean; // If true, shows "A" instead of paintbrush icon
 }
 
 // Default 16-color palette (4x4 grid) - common design tool colors
@@ -38,6 +39,7 @@ export const ColorPickerControl: React.FC<ColorPickerControlProps> = ({
   onChange,
   onColorCommit,
   recentColors = [],
+  showTextIcon = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [initialColor, setInitialColor] = useState(value); // Track color when popover opened
@@ -109,14 +111,24 @@ export const ColorPickerControl: React.FC<ColorPickerControlProps> = ({
         onClick={handleTogglePopover}
         className="w-8 h-8 rounded border-2 border-gray-300 hover:border-gray-400 transition-colors flex items-center justify-center group"
         style={{ backgroundColor: value }}
-        title="Fill Color"
+        title={showTextIcon ? "Text Color" : "Fill Color"}
       >
-        <Paintbrush
-          size={16}
-          className={`${
-            isLightColor(value) ? 'text-gray-700' : 'text-white'
-          } group-hover:scale-110 transition-transform`}
-        />
+        {showTextIcon ? (
+          <span
+            className={`text-base font-bold ${
+              isLightColor(value) ? 'text-gray-700' : 'text-white'
+            } group-hover:scale-110 transition-transform`}
+          >
+            A
+          </span>
+        ) : (
+          <Paintbrush
+            size={16}
+            className={`${
+              isLightColor(value) ? 'text-gray-700' : 'text-white'
+            } group-hover:scale-110 transition-transform`}
+          />
+        )}
       </button>
 
       {/* Color Picker Popover */}

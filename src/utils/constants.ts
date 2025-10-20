@@ -46,3 +46,14 @@ export const DEFAULT_SHAPE_FILL = '#FFFFFF'; // White fill
 export const DEFAULT_SHAPE_STROKE = '#1F2937'; // Gray-800 border
 export const DEFAULT_SHAPE_STROKE_WIDTH = 2; // 2px border
 
+/**
+ * Text box default properties
+ * Applied to all newly created text boxes
+ */
+export const DEFAULT_TEXT_WIDTH = 200; // Default text box width in pixels
+export const DEFAULT_FONT_SIZE = 16; // Default font size in pixels
+export const DEFAULT_FONT_FAMILY = 'Arial'; // Default font family
+export const DEFAULT_TEXT_COLOR = '#000000'; // Black text
+export const MIN_TEXT_WIDTH = 50; // Minimum text box width in pixels
+export const MAX_TEXT_LENGTH = 5000; // Maximum characters in a text box
+
