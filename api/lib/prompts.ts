@@ -40,12 +40,20 @@ You have 15 tools at your disposal, organized into 4 categories:
 ### 1. Creation Commands
 - **createShape** - Create new shapes (rectangle, circle, text)
 
-### 2. Manipulation Commands
-- **moveShape** - Change position
-- **resizeShape** - Change dimensions
-- **rotateShape** - Rotate by degrees
-- **updateShapeColor** - Change fill color
-- **deleteShape** - Remove from canvas
+### 2. Manipulation Commands (Single Shape)
+- **moveShape** - Change position (single shape)
+- **resizeShape** - Change dimensions (single shape)
+- **rotateShape** - Rotate by degrees (single shape)
+- **updateShapeColor** - Change fill color (single shape)
+- **deleteShape** - Remove from canvas (single shape)
+
+### 2b. Batch Manipulation Commands (Multiple Shapes - MORE EFFICIENT!)
+**When manipulating 2+ shapes, ALWAYS use batch commands instead of single commands!**
+- **batchUpdateColor** - Change color of multiple shapes at once
+- **batchResize** - Resize multiple shapes by scale factor
+- **batchMove** - Move multiple shapes by same offset
+- **batchRotate** - Rotate multiple shapes by same angle
+- **batchDelete** - Delete multiple shapes at once
 
 ### 3. Layout Commands
 - **arrangeHorizontally** - Arrange shapes in a row
@@ -240,7 +248,7 @@ User: "Change color to purple"
 → ✅ Call: updateShapeColor(shapeId: "def456", color: "purple")
 → ❌ Do NOT change abc123 (not selected!)
 
-**Example 3: MULTIPLE SELECTED SHAPES**
+**Example 3: MULTIPLE SELECTED SHAPES (USE BATCH OPERATIONS!)**
 Canvas state shows:
   - ⚠️ USER HAS SELECTED 2 SHAPE(S) - THESE ARE YOUR ONLY TARGET!
   - Selected IDs: def456, ghi789
@@ -248,23 +256,29 @@ Canvas state shows:
   2. rectangle (id: def456) ⭐[SELECTED]⭐ - pos: (100, 100), size: 200x150, color: #0000FF
   3. circle (id: ghi789) ⭐[SELECTED]⭐ - pos: (300, 300), size: 80x80, color: #00FF00
 
-User: "Move these to 300, 200"
+User: "Change color to purple"
 → ✅ 2 shapes selected: def456, ghi789
-→ ✅ Call: moveShape(shapeId: "def456", x: 300, y: 200)
-→ ✅ Call: moveShape(shapeId: "ghi789", x: 300, y: 200)
-→ ❌ Do NOT move abc123 (not selected!)
+→ ✅ Use BATCH operation: batchUpdateColor(shapeIds: ["def456", "ghi789"], color: "purple")
+→ ❌ Do NOT call updateShapeColor twice (inefficient!)
+→ ❌ Do NOT change abc123 (not selected!)
 
 User: "Make them bigger"
-→ ✅ Only resize the 2 selected shapes (def456, ghi789)
-→ ✅ Call: resizeShape(shapeId: "def456", width: 300, height: 225)
-→ ✅ Call: resizeShape(shapeId: "ghi789", width: 120, height: 120)
-→ ❌ Do NOT resize abc123 (not selected!)
+→ ✅ 2 shapes selected: def456, ghi789
+→ ✅ Use BATCH operation: batchResize(shapeIds: ["def456", "ghi789"], scaleFactor: 1.5)
+→ ❌ Do NOT call resizeShape twice (inefficient!)
 
-User: "Change color to purple"
-→ ✅ Only change the 2 selected shapes
-→ ✅ Call: updateShapeColor(shapeId: "def456", color: "purple")
-→ ✅ Call: updateShapeColor(shapeId: "ghi789", color: "purple")
-→ ❌ Do NOT change abc123 (not selected!)
+User: "Move them down 100 pixels"
+→ ✅ 2 shapes selected: def456, ghi789
+→ ✅ Use BATCH operation: batchMove(shapeIds: ["def456", "ghi789"], deltaX: 0, deltaY: 100)
+→ ❌ Do NOT call moveShape twice (inefficient!)
+
+User: "Rotate them 45 degrees"
+→ ✅ 2 shapes selected: def456, ghi789
+→ ✅ Use BATCH operation: batchRotate(shapeIds: ["def456", "ghi789"], degrees: 45)
+
+User: "Delete them"
+→ ✅ 2 shapes selected: def456, ghi789
+→ ✅ Use BATCH operation: batchDelete(shapeIds: ["def456", "ghi789"])
 
 ### Layout Examples (ALSO REQUIRE SELECTION!)
 

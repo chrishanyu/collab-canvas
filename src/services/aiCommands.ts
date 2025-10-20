@@ -68,6 +68,22 @@ export async function executeFunctionCall(
       case 'deleteShape':
         return await executeDeleteShape(functionCall.arguments, canvasId, userId);
       
+      // Batch manipulation commands
+      case 'batchUpdateColor':
+        return await executeBatchUpdateColor(functionCall.arguments, canvasId, userId);
+      
+      case 'batchResize':
+        return await executeBatchResize(functionCall.arguments, canvasId, userId);
+      
+      case 'batchMove':
+        return await executeBatchMove(functionCall.arguments, canvasId, userId);
+      
+      case 'batchRotate':
+        return await executeBatchRotate(functionCall.arguments, canvasId, userId);
+      
+      case 'batchDelete':
+        return await executeBatchDelete(functionCall.arguments, canvasId, userId);
+      
       // Layout commands
       case 'arrangeHorizontally':
         return await executeArrangeHorizontally(functionCall.arguments, canvasId, userId);
@@ -230,6 +246,7 @@ async function executeCreateShape(
     return {
       success: true,
       shapeIds: [createdShape.id],
+      operationType: 'create',
     };
   } catch (error: any) {
     return {
@@ -271,6 +288,7 @@ async function executeMoveShape(
     return {
       success: true,
       shapeIds: [shapeId],
+      operationType: 'update',
     };
   } catch (error: any) {
     return {
@@ -345,6 +363,7 @@ async function executeResizeShape(
     return {
       success: true,
       shapeIds: [shapeId],
+      operationType: 'update',
     };
   } catch (error: any) {
     return {
@@ -389,6 +408,7 @@ async function executeRotateShape(
     return {
       success: true,
       shapeIds: [shapeId],
+      operationType: 'update',
     };
   } catch (error: any) {
     return {
@@ -433,6 +453,7 @@ async function executeUpdateShapeColor(
     return {
       success: true,
       shapeIds: [shapeId],
+      operationType: 'update',
     };
   } catch (error: any) {
     return {
@@ -467,11 +488,261 @@ async function executeDeleteShape(
     return {
       success: true,
       shapeIds: [shapeId],
+      operationType: 'delete',
     };
   } catch (error: any) {
     return {
       success: false,
       error: error.message || 'Failed to delete shape',
+    };
+  }
+}
+
+/**
+ * ==================== BATCH MANIPULATION HANDLERS ====================
+ * These handlers perform operations on multiple shapes efficiently
+ */
+
+/**
+ * Execute batchUpdateColor function call
+ */
+async function executeBatchUpdateColor(
+  args: Record<string, any>,
+  canvasId: string,
+  userId: string
+): Promise<ExecutionResult> {
+  const { shapeIds, color } = args;
+
+  // Validate required arguments
+  if (!Array.isArray(shapeIds) || shapeIds.length === 0) {
+    return {
+      success: false,
+      error: 'Invalid or empty shapeIds array',
+    };
+  }
+
+  if (!color || typeof color !== 'string') {
+    return {
+      success: false,
+      error: 'Invalid or missing color',
+    };
+  }
+
+  // Normalize color (convert names to hex)
+  const normalizedColor = normalizeColor(color);
+
+  // Update all shapes
+  try {
+    const updatePromises = shapeIds.map(shapeId => 
+      updateShape(canvasId, shapeId, { fill: normalizedColor }, userId)
+    );
+    await Promise.all(updatePromises);
+
+    return {
+      success: true,
+      shapeIds,
+      operationType: 'update',
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Failed to update shape colors',
+    };
+  }
+}
+
+/**
+ * Execute batchResize function call
+ */
+async function executeBatchResize(
+  args: Record<string, any>,
+  canvasId: string,
+  userId: string
+): Promise<ExecutionResult> {
+  const { shapeIds, scaleFactor } = args;
+
+  // Validate required arguments
+  if (!Array.isArray(shapeIds) || shapeIds.length === 0) {
+    return {
+      success: false,
+      error: 'Invalid or empty shapeIds array',
+    };
+  }
+
+  if (typeof scaleFactor !== 'number' || scaleFactor <= 0) {
+    return {
+      success: false,
+      error: 'Invalid scale factor (must be positive number)',
+    };
+  }
+
+  // Get all shapes to calculate new sizes
+  try {
+    const shapes = await getCanvasObjects(canvasId);
+    const shapesMap = new Map(shapes.map(s => [s.id, s]));
+
+    const updatePromises = shapeIds.map(shapeId => {
+      const shape = shapesMap.get(shapeId);
+      if (!shape) return Promise.resolve();
+
+      const newWidth = Math.round(shape.width * scaleFactor);
+      const newHeight = Math.round(shape.height * scaleFactor);
+
+      return updateShape(canvasId, shapeId, { width: newWidth, height: newHeight }, userId);
+    });
+
+    await Promise.all(updatePromises);
+
+    return {
+      success: true,
+      shapeIds,
+      operationType: 'update',
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Failed to resize shapes',
+    };
+  }
+}
+
+/**
+ * Execute batchMove function call
+ */
+async function executeBatchMove(
+  args: Record<string, any>,
+  canvasId: string,
+  userId: string
+): Promise<ExecutionResult> {
+  const { shapeIds, deltaX, deltaY } = args;
+
+  // Validate required arguments
+  if (!Array.isArray(shapeIds) || shapeIds.length === 0) {
+    return {
+      success: false,
+      error: 'Invalid or empty shapeIds array',
+    };
+  }
+
+  if (typeof deltaX !== 'number' || typeof deltaY !== 'number') {
+    return {
+      success: false,
+      error: 'Invalid delta values',
+    };
+  }
+
+  // Get all shapes to calculate new positions
+  try {
+    const shapes = await getCanvasObjects(canvasId);
+    const shapesMap = new Map(shapes.map(s => [s.id, s]));
+
+    const updatePromises = shapeIds.map(shapeId => {
+      const shape = shapesMap.get(shapeId);
+      if (!shape) return Promise.resolve();
+
+      const newX = shape.x + deltaX;
+      const newY = shape.y + deltaY;
+
+      return updateShape(canvasId, shapeId, { x: newX, y: newY }, userId);
+    });
+
+    await Promise.all(updatePromises);
+
+    return {
+      success: true,
+      shapeIds,
+      operationType: 'update',
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Failed to move shapes',
+    };
+  }
+}
+
+/**
+ * Execute batchRotate function call
+ */
+async function executeBatchRotate(
+  args: Record<string, any>,
+  canvasId: string,
+  userId: string
+): Promise<ExecutionResult> {
+  const { shapeIds, degrees } = args;
+
+  // Validate required arguments
+  if (!Array.isArray(shapeIds) || shapeIds.length === 0) {
+    return {
+      success: false,
+      error: 'Invalid or empty shapeIds array',
+    };
+  }
+
+  if (typeof degrees !== 'number') {
+    return {
+      success: false,
+      error: 'Invalid degrees value',
+    };
+  }
+
+  // Normalize rotation to 0-360
+  const normalizedDegrees = ((degrees % 360) + 360) % 360;
+
+  // Update all shapes
+  try {
+    const updatePromises = shapeIds.map(shapeId => 
+      updateShape(canvasId, shapeId, { rotation: normalizedDegrees }, userId)
+    );
+    await Promise.all(updatePromises);
+
+    return {
+      success: true,
+      shapeIds,
+      operationType: 'update',
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Failed to rotate shapes',
+    };
+  }
+}
+
+/**
+ * Execute batchDelete function call
+ */
+async function executeBatchDelete(
+  args: Record<string, any>,
+  canvasId: string,
+  _userId: string
+): Promise<ExecutionResult> {
+  const { shapeIds } = args;
+
+  // Validate required arguments
+  if (!Array.isArray(shapeIds) || shapeIds.length === 0) {
+    return {
+      success: false,
+      error: 'Invalid or empty shapeIds array',
+    };
+  }
+
+  // Delete all shapes
+  try {
+    const deletePromises = shapeIds.map(shapeId => 
+      deleteShape(canvasId, shapeId)
+    );
+    await Promise.all(deletePromises);
+
+    return {
+      success: true,
+      shapeIds,
+      operationType: 'delete',
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Failed to delete shapes',
     };
   }
 }
@@ -661,6 +932,7 @@ async function executeCreateGrid(
     return {
       success: true,
       shapeIds: createdIds,
+      operationType: 'create',
     };
   } catch (error: any) {
     return {

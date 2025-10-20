@@ -55,5 +55,6 @@ export interface ExecutionResult {
   success: boolean;
   shapeIds?: string[];
   error?: string;
+  operationType?: 'create' | 'update' | 'delete' | 'query';
 }
 

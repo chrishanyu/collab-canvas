@@ -86,13 +86,24 @@ export function useAIAgent({
         lastCommand: command,
       });
 
-      // Show success message
+      // Show success message based on operation type
       const shapeCount = executionResult.shapeIds?.length || 0;
+      const operationType = executionResult.operationType;
+      
       if (shapeCount > 0) {
-        showSuccessToast(`✓ Created ${shapeCount} shape${shapeCount > 1 ? 's' : ''}`);
+        // Customize message based on operation type
+        let message = '✓ Command executed successfully';
+        if (operationType === 'create') {
+          message = `✓ Created ${shapeCount} shape${shapeCount > 1 ? 's' : ''}`;
+        } else if (operationType === 'update') {
+          message = `✓ Updated ${shapeCount} shape${shapeCount > 1 ? 's' : ''}`;
+        } else if (operationType === 'delete') {
+          message = `✓ Deleted ${shapeCount} shape${shapeCount > 1 ? 's' : ''}`;
+        }
+        showSuccessToast(message);
         
-        // Auto-select created shapes if callback provided
-        if (onShapesCreated && executionResult.shapeIds) {
+        // Auto-select created shapes if callback provided (only for create operations)
+        if (operationType === 'create' && onShapesCreated && executionResult.shapeIds) {
           onShapesCreated(executionResult.shapeIds);
         }
       } else {

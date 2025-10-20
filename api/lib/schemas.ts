@@ -164,6 +164,118 @@ export const TOOLS = [
       },
     },
   },
+  
+  // ==================== BATCH MANIPULATION COMMANDS ====================
+  {
+    type: 'function' as const,
+    function: {
+      name: 'batchUpdateColor',
+      description: 'Change the color of multiple shapes at once (more efficient than calling updateShapeColor multiple times)',
+      parameters: {
+        type: 'object',
+        properties: {
+          shapeIds: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Array of shape IDs to update',
+          },
+          color: {
+            type: 'string',
+            description: 'New color as hex code or name (e.g., #FF0000 or red)',
+          },
+        },
+        required: ['shapeIds', 'color'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'batchResize',
+      description: 'Resize multiple shapes at once by a scale factor or to specific dimensions',
+      parameters: {
+        type: 'object',
+        properties: {
+          shapeIds: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Array of shape IDs to resize',
+          },
+          scaleFactor: {
+            type: 'number',
+            description: 'Scale factor (e.g., 1.5 for 150%, 0.5 for 50%)',
+          },
+        },
+        required: ['shapeIds', 'scaleFactor'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'batchMove',
+      description: 'Move multiple shapes by the same offset (relative movement)',
+      parameters: {
+        type: 'object',
+        properties: {
+          shapeIds: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Array of shape IDs to move',
+          },
+          deltaX: {
+            type: 'number',
+            description: 'Horizontal offset in pixels',
+          },
+          deltaY: {
+            type: 'number',
+            description: 'Vertical offset in pixels',
+          },
+        },
+        required: ['shapeIds', 'deltaX', 'deltaY'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'batchRotate',
+      description: 'Rotate multiple shapes by the same angle',
+      parameters: {
+        type: 'object',
+        properties: {
+          shapeIds: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Array of shape IDs to rotate',
+          },
+          degrees: {
+            type: 'number',
+            description: 'Rotation angle in degrees',
+          },
+        },
+        required: ['shapeIds', 'degrees'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'batchDelete',
+      description: 'Delete multiple shapes at once',
+      parameters: {
+        type: 'object',
+        properties: {
+          shapeIds: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Array of shape IDs to delete',
+          },
+        },
+        required: ['shapeIds'],
+      },
+    },
+  },
 
   // ==================== LAYOUT COMMANDS ====================
   {
