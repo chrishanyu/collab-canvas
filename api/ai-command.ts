@@ -117,15 +117,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       let contextMessage = `Current canvas state:\n`;
       contextMessage += `- Total shapes: ${canvasState.shapes.length}\n`;
       
+      // Calculate and add viewport center information
+      if (canvasState.viewport) {
+        const { x, y, scale, width, height } = canvasState.viewport;
+        // Convert viewport center from screen coordinates to canvas coordinates
+        const viewportCenterX = Math.round((width / 2 - x) / scale);
+        const viewportCenterY = Math.round((height / 2 - y) / scale);
+        contextMessage += `- 📍 USER'S VIEWPORT CENTER: (${viewportCenterX}, ${viewportCenterY}) ← Use this for new shape positions!\n`;
+        contextMessage += `- Viewport zoom: ${Math.round(scale * 100)}%\n`;
+      }
+      
       if (selectedShapeIds.length > 0) {
         contextMessage += `- ⚠️ USER HAS SELECTED ${selectedShapeIds.length} SHAPE(S) - THESE ARE YOUR ONLY TARGET!\n`;
         contextMessage += `- Selected IDs: ${selectedShapeIds.join(', ')}\n`;
         contextMessage += `- 🎯 For manipulation commands: Use ONLY these selected shapes!\n`;
       } else {
-        contextMessage += `- ⚠️ NO SHAPES SELECTED!\n`;
-        contextMessage += `- 🚫 MANIPULATION COMMANDS ARE NOT ALLOWED (move, resize, rotate, color, delete, arrange)\n`;
-        contextMessage += `- ✅ CREATION COMMANDS ARE ALLOWED (createShape, createGrid)\n`;
-        contextMessage += `- 💬 If user tries to manipulate, respond: "Please select the shapes you want to manipulate first."\n`;
+        contextMessage += `- No shapes selected\n`;
+        contextMessage += `- ✅ CREATION commands work fine (createShape, createGrid, etc.)\n`;
+        contextMessage += `- ⚠️ MANIPULATION commands need selection (move, resize, color, delete, arrange)\n`;
       }
       
       contextMessage += `\nShapes visible to you:\n`;
@@ -149,7 +158,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       messages,
       tools: TOOLS,
       tool_choice: 'auto',
-      reasoning_effort: 'minimal',
+      reasoning_effort: AI_CONFIG.reasoning_effort,
     });
 
     const responseMessage = completion.choices[0]?.message;

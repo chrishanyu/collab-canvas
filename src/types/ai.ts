@@ -35,6 +35,8 @@ export interface CanvasState {
     x: number;
     y: number;
     scale: number;
+    width: number;
+    height: number;
   };
 }
 

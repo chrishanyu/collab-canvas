@@ -1676,6 +1676,8 @@ export const Canvas: React.FC = () => {
               x: stageX,
               y: stageY,
               scale: stageScale,
+              width: stageWidth,
+              height: stageHeight,
             },
           }}
         />
