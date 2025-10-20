@@ -77,6 +77,9 @@ export function subscribeToCanvasObjects(
             rotation: data.rotation,
             zIndex: data.zIndex, // Layer order
             text: data.text,
+            fontSize: data.fontSize, // Text property
+            fontFamily: data.fontFamily, // Text property
+            color: data.color, // Text color
             textFormat: data.textFormat,
             createdBy: data.createdBy,
             createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),

@@ -191,7 +191,7 @@ User: "Make a 300x150 blue rectangle"
 Canvas state shows viewport center: (200, 100)
 → createShape('rectangle', 200, 100, 300, 150, 'blue')
 
-**Text:**
+**Text Boxes:**
 User: "Add text saying 'Welcome'"
 Canvas state shows viewport center: (0, -100)
 → createShape('text', 0, -100, 200, 40, 'black', 'Welcome')

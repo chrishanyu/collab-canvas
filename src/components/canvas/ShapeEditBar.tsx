@@ -2,6 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import type { CanvasObject } from '../../types';
 import { ColorPickerControl } from './ColorPickerControl';
 import { ZIndexControls } from './ZIndexControls';
+import { TextColorControl } from './TextColorControl';
+import { TextStyleControls } from './TextStyleControls';
+import { FontSizeControl } from './FontSizeControl';
+import { DEFAULT_TEXT_COLOR, DEFAULT_FONT_SIZE } from '../../utils/constants';
 
 export interface ShapeEditBarProps {
   shape: CanvasObject;
@@ -9,6 +13,7 @@ export interface ShapeEditBarProps {
   stageX: number;
   stageY: number;
   onUpdate: (updates: Partial<CanvasObject>) => void;
+  onLivePreview?: (updates: Partial<CanvasObject>) => void; // Called during live preview (no Firebase)
   onColorCommit?: (color: string) => void; // Called when user commits color (not during preview)
   onBringToFront?: () => void; // Layer control handlers
   onSendToBack?: () => void;
@@ -34,6 +39,7 @@ export const ShapeEditBar: React.FC<ShapeEditBarProps> = ({
   stageX,
   stageY,
   onUpdate,
+  onLivePreview,
   onColorCommit,
   onBringToFront,
   onSendToBack,
@@ -96,6 +102,48 @@ export const ShapeEditBar: React.FC<ShapeEditBarProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const isTextBox = shape.type === 'text';
+
+  // Text formatting handlers
+  const handleToggleBold = () => {
+    const currentBold = shape.textFormat?.bold || false;
+    const updates = {
+      textFormat: {
+        ...shape.textFormat,
+        bold: !currentBold,
+      },
+    };
+    // Use live preview first for instant feedback, then commit
+    if (onLivePreview) {
+      onLivePreview(updates);
+    }
+    onUpdate(updates);
+  };
+
+  const handleToggleItalic = () => {
+    const currentItalic = shape.textFormat?.italic || false;
+    const updates = {
+      textFormat: {
+        ...shape.textFormat,
+        italic: !currentItalic,
+      },
+    };
+    // Use live preview first for instant feedback, then commit
+    if (onLivePreview) {
+      onLivePreview(updates);
+    }
+    onUpdate(updates);
+  };
+
+  const handleFontSizeChange = (fontSize: number) => {
+    const updates = { fontSize };
+    // Use live preview first for instant feedback, then commit
+    if (onLivePreview) {
+      onLivePreview(updates);
+    }
+    onUpdate(updates);
+  };
+
   return (
     <div
       ref={barRef}
@@ -111,20 +159,54 @@ export const ShapeEditBar: React.FC<ShapeEditBarProps> = ({
     >
       {/* Horizontal flex container for extensible controls */}
       <div className="flex items-center gap-2">
-        {/* Color Picker Control */}
-        <ColorPickerControl
-          value={shape.fill}
-          onChange={(color) => onUpdate({ fill: color })}
-          onColorCommit={onColorCommit}
-          recentColors={recentColors}
-        />
-        
-        {/* Z-Index Controls */}
-        {onBringToFront && onSendToBack && (
-          <ZIndexControls
-            onBringToFront={onBringToFront}
-            onSendToBack={onSendToBack}
-          />
+        {isTextBox ? (
+          <>
+            {/* Text Box Controls */}
+            <TextColorControl
+              value={shape.color || DEFAULT_TEXT_COLOR}
+              onChange={(color) => onLivePreview ? onLivePreview({ color }) : onUpdate({ color })}
+              onColorCommit={onColorCommit}
+              recentColors={recentColors}
+            />
+            
+            <TextStyleControls
+              isBold={shape.textFormat?.bold || false}
+              isItalic={shape.textFormat?.italic || false}
+              onToggleBold={handleToggleBold}
+              onToggleItalic={handleToggleItalic}
+            />
+            
+            <FontSizeControl
+              value={shape.fontSize || DEFAULT_FONT_SIZE}
+              onChange={handleFontSizeChange}
+            />
+            
+            {/* Z-Index Controls */}
+            {onBringToFront && onSendToBack && (
+              <ZIndexControls
+                onBringToFront={onBringToFront}
+                onSendToBack={onSendToBack}
+              />
+            )}
+          </>
+        ) : (
+          <>
+            {/* Regular Shape Controls */}
+            <ColorPickerControl
+              value={shape.fill}
+              onChange={(color) => onLivePreview ? onLivePreview({ fill: color }) : onUpdate({ fill: color })}
+              onColorCommit={onColorCommit}
+              recentColors={recentColors}
+            />
+            
+            {/* Z-Index Controls */}
+            {onBringToFront && onSendToBack && (
+              <ZIndexControls
+                onBringToFront={onBringToFront}
+                onSendToBack={onSendToBack}
+              />
+            )}
+          </>
         )}
         
         {/* Additional controls can be added here */}

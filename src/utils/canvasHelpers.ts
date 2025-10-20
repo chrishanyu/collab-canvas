@@ -113,3 +113,187 @@ export const getMinZIndex = (shapes: Array<{ zIndex?: number }>): number => {
   const zIndices = shapes.map(shape => shape.zIndex ?? 0);
   return Math.min(...zIndices);
 };
+
+/**
+ * Text Box Helper Functions
+ * Utilities for text measurement, wrapping, and height calculation
+ */
+
+/**
+ * Calculate text height based on content, width, font size, and font family
+ * Uses canvas measureText API to accurately measure text dimensions
+ * @param text - The text content to measure
+ * @param width - Maximum width for text wrapping
+ * @param fontSize - Font size in pixels
+ * @param fontFamily - Font family name
+ * @param lineHeight - Line height multiplier (default: 1.2)
+ * @returns Height in pixels needed to display the text
+ */
+export const calculateTextHeight = (
+  text: string,
+  width: number,
+  fontSize: number,
+  fontFamily: string,
+  lineHeight: number = 1.2
+): number => {
+  if (!text || text.trim() === '') {
+    // Empty text - return one line height
+    return fontSize * lineHeight;
+  }
+
+  // Create a temporary canvas for text measurement
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  
+  if (!context) {
+    // Fallback if canvas context is not available
+    const lines = text.split('\n').length;
+    return lines * fontSize * lineHeight;
+  }
+
+  context.font = `${fontSize}px ${fontFamily}`;
+  
+  // Split text by existing newlines
+  const paragraphs = text.split('\n');
+  let totalLines = 0;
+
+  // Process each paragraph separately
+  paragraphs.forEach(paragraph => {
+    if (paragraph.trim() === '') {
+      totalLines += 1; // Empty line
+      return;
+    }
+
+    // Word wrapping logic
+    const words = paragraph.split(' ');
+    let currentLine = '';
+    let lineCount = 0;
+
+    words.forEach((word, index) => {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const metrics = context.measureText(testLine);
+      const testWidth = metrics.width;
+
+      if (testWidth > width && currentLine !== '') {
+        // Line exceeds width, wrap to next line
+        lineCount++;
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+
+      // Last word - count the current line
+      if (index === words.length - 1) {
+        lineCount++;
+      }
+    });
+
+    totalLines += lineCount;
+  });
+
+  return totalLines * fontSize * lineHeight;
+};
+
+/**
+ * Wrap text to fit within a given width
+ * Returns an array of lines that fit within the width constraint
+ * @param text - The text content to wrap
+ * @param width - Maximum width for each line
+ * @param fontSize - Font size in pixels
+ * @param fontFamily - Font family name
+ * @returns Array of wrapped text lines
+ */
+export const wrapText = (
+  text: string,
+  width: number,
+  fontSize: number,
+  fontFamily: string
+): string[] => {
+  if (!text || text.trim() === '') {
+    return [''];
+  }
+
+  // Create a temporary canvas for text measurement
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  
+  if (!context) {
+    // Fallback - return lines split by newlines
+    return text.split('\n');
+  }
+
+  context.font = `${fontSize}px ${fontFamily}`;
+  
+  const allLines: string[] = [];
+  const paragraphs = text.split('\n');
+
+  // Process each paragraph separately
+  paragraphs.forEach(paragraph => {
+    if (paragraph.trim() === '') {
+      allLines.push(''); // Preserve empty lines
+      return;
+    }
+
+    const words = paragraph.split(' ');
+    let currentLine = '';
+
+    words.forEach((word) => {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const metrics = context.measureText(testLine);
+      const testWidth = metrics.width;
+
+      if (testWidth > width && currentLine !== '') {
+        // Line exceeds width, wrap to next line
+        allLines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    });
+
+    // Add remaining text
+    if (currentLine) {
+      allLines.push(currentLine);
+    }
+  });
+
+  return allLines.length > 0 ? allLines : [''];
+};
+
+/**
+ * Get text metrics for a given string
+ * Returns width and height information
+ * @param text - The text to measure
+ * @param fontSize - Font size in pixels
+ * @param fontFamily - Font family name
+ * @returns Object with width and height metrics
+ */
+export const getTextMetrics = (
+  text: string,
+  fontSize: number,
+  fontFamily: string
+): { width: number; height: number } => {
+  if (!text || text.trim() === '') {
+    return { width: 0, height: fontSize };
+  }
+
+  // Create a temporary canvas for text measurement
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  
+  if (!context) {
+    // Fallback estimation
+    return {
+      width: text.length * fontSize * 0.6, // Rough estimate
+      height: fontSize
+    };
+  }
+
+  context.font = `${fontSize}px ${fontFamily}`;
+  const metrics = context.measureText(text);
+  
+  return {
+    width: metrics.width,
+    height: fontSize // Single line height
+  };
+};

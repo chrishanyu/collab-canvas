@@ -2,14 +2,17 @@ import React, { useState } from 'react';
 import { Rect, Circle, Ellipse, Star, RegularPolygon } from 'react-konva';
 import type { CanvasObject } from '../../types';
 import Konva from 'konva';
+import { TextBox } from './TextBox';
 
 interface ShapeProps {
   shape: CanvasObject;
   isSelected: boolean;
+  isEditMode?: boolean;
   onSelect: (id: string, event?: Konva.KonvaEventObject<MouseEvent>) => void;
   onDragStart: (id: string) => void;
   onDragMove: (id: string, x: number, y: number) => void;
   onDragEnd: (id: string, x: number, y: number) => void;
+  onEnterEditMode?: (id: string) => void;
   isBeingEdited?: boolean;
   editorName?: string;
   editorColor?: string;
@@ -27,11 +30,13 @@ interface ShapeProps {
  */
 export const Shape = React.memo(({ 
   shape, 
-  isSelected, 
+  isSelected,
+  isEditMode = false,
   onSelect, 
   onDragStart,
   onDragMove,
   onDragEnd,
+  onEnterEditMode,
   isBeingEdited = false,
   editorName,
   editorColor,
@@ -48,7 +53,8 @@ export const Shape = React.memo(({
     let currentY = node.y();
     
     // For center-based shapes, convert center position back to top-left equivalent
-    if (shape.type !== 'rectangle') {
+    // Rectangle and text use top-left positioning, others use center
+    if (shape.type !== 'rectangle' && shape.type !== 'text') {
       currentX = node.x() - shape.width / 2;
       currentY = node.y() - shape.height / 2;
     }
@@ -63,7 +69,8 @@ export const Shape = React.memo(({
     
     // For center-based shapes, convert center position back to top-left equivalent
     // This ensures consistent storage format in the database
-    if (shape.type !== 'rectangle') {
+    // Rectangle and text use top-left positioning, others use center
+    if (shape.type !== 'rectangle' && shape.type !== 'text') {
       finalX = node.x() - shape.width / 2;
       finalY = node.y() - shape.height / 2;
     }
@@ -208,6 +215,24 @@ export const Shape = React.memo(({
           sides={8}
           radius={shape.width / 2}
           {...commonProps}
+        />
+      );
+
+    case 'text':
+      // Text box - delegated to TextBox component
+      return (
+        <TextBox
+          shape={shape}
+          isSelected={isSelected}
+          isEditMode={isEditMode}
+          onSelect={onSelect}
+          onDragStart={onDragStart}
+          onDragMove={onDragMove}
+          onDragEnd={onDragEnd}
+          onEnterEditMode={onEnterEditMode}
+          isBeingEdited={isBeingEdited}
+          editorName={editorName}
+          editorColor={editorColor}
         />
       );
 
